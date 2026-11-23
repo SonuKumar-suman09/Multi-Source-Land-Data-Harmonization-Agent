@@ -16,6 +16,7 @@ from app.models.entities import (
     Workspace, WorkspaceMembership,
 )
 from app.services.harmonization import _area, _geometry, _record_date, map_columns
+from app.services.quality_assurance import _schema_findings
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -49,6 +50,17 @@ def test_unknown_area_unit_and_invalid_coordinate_are_not_silently_fixed() -> No
     assert "bounds" in error
 
 
+def test_pandera_reports_invalid_canonical_fields_by_record() -> None:
+    record_id = uuid4()
+    record = HarmonizedLandRecord(
+        id=record_id, plot_id="", owner_name="", area_acres=Decimal("-2"), quality_score=120
+    )
+    findings = _schema_findings([record])
+    assert findings
+    assert all(item.record_id == record_id for item in findings)
+    assert {item.code for item in findings} >= {"qa_schema_plot_id", "qa_schema_area_acres", "qa_schema_quality_score"}
+
+
 def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
     email = f"phase6-{uuid4().hex}@example.com"
     password = "correct-horse-battery-staple"
@@ -77,6 +89,17 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
         assert summary["harmonized_records"] == 11
         assert summary["duplicate_pairs"] >= 2
         assert summary["validation_findings"] > 0
+
+        quality = client.post(f"/api/v1/quality/jobs/{job_id}/run", headers=headers)
+        assert quality.status_code == 200, quality.text
+        quality_report = quality.json()
+        assert quality_report["records_checked"] == 11
+        assert quality_report["critical_errors"] > 0
+        assert quality_report["warnings"] > 0
+        assert 0 <= quality_report["quality_score"] <= 100
+        repeated_quality = client.post(f"/api/v1/quality/jobs/{job_id}/run", headers=headers)
+        assert repeated_quality.status_code == 200
+        assert repeated_quality.json()["already_completed"] is True
 
         with SessionLocal() as db:
             records = db.scalars(select(HarmonizedLandRecord).where(HarmonizedLandRecord.job_id == job_id)).all()

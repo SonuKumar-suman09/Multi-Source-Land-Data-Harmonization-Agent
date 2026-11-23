@@ -7,6 +7,7 @@ geopandas==1.2.0
 GeoAlchemy2==0.20.0
 numpy==2.5.5
 openpyxl==3.1.5
+pandera==0.36.0
 pandas==3.1.1
 pgvector==0.5.1
 pyogrio==0.13.0
