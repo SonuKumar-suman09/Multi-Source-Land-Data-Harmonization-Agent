@@ -4,7 +4,7 @@ An incremental project for safely ingesting, harmonizing, validating, and review
 
 ## Current milestone
 
-Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture.md). Phase 2 has the project skeleton and synthetic CSV, Excel, and GeoJSON inputs. Phase 3 is running locally with PostgreSQL 17, PostGIS 3.7, pgvector 0.8.7, SQLAlchemy models, and the initial Alembic migration. The database is available at `127.0.0.1:5433` because Windows would not allow Docker to bind host port `5432`. Phase 4 provides JWT authentication, Argon2 password hashing, protected routes, health checks, and a default workspace for each account. Phase 5 adds authenticated CSV, Excel, JSON, GeoJSON, and zipped Shapefile ingestion with immutable local originals, hashes, metadata, and raw-row lineage. Phase 6 adds deterministic alias-based harmonization, area normalization to acres, CRS conversion to EPSG:4326, validation findings, duplicate/conflict candidates, and row-level transformation provenance. Phase 7 adds an authenticated, repeat-safe quality assurance pass using Pandera canonical-schema checks, deterministic land rules, PostGIS geometry validation, and polygon-overlap detection. Phase 8 adds a LangGraph coordinator with ingestion verification, harmonization and QA nodes, retry policy for transient database failures, PostgreSQL checkpoints, and auditable workflow status. Phase 9 adds workspace-scoped rule-document indexing, Gemini embeddings, pgvector semantic retrieval, and retrieved rule references in QA reports.
+Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture.md). Phase 2 has the project skeleton and synthetic CSV, Excel, and GeoJSON inputs. Phase 3 is running locally with PostgreSQL 17, PostGIS 3.7, pgvector 0.8.7, SQLAlchemy models, and the initial Alembic migration. The database is available at `127.0.0.1:5433` because Windows would not allow Docker to bind host port `5432`. Phase 4 provides JWT authentication, Argon2 password hashing, protected routes, health checks, and a default workspace for each account. Phase 5 adds authenticated CSV, Excel, JSON, GeoJSON, and zipped Shapefile ingestion with immutable local originals, hashes, metadata, and raw-row lineage. Phase 6 adds deterministic alias-based harmonization, area normalization to acres, CRS conversion to EPSG:4326, validation findings, duplicate/conflict candidates, and row-level transformation provenance. Phase 7 adds an authenticated, repeat-safe quality assurance pass using Pandera canonical-schema checks, deterministic land rules, PostGIS geometry validation, and polygon-overlap detection. Phase 8 adds a LangGraph coordinator with ingestion verification, harmonization and QA nodes, retry policy for transient database failures, PostgreSQL checkpoints, and auditable workflow status. Phase 9 adds workspace-scoped rule-document indexing, Gemini embeddings, pgvector semantic retrieval, and retrieved rule references in QA reports. Phase 10 runs the same checkpointed workflow as a durable Celery task using Redis, with queued/running/completed/failed state, idempotent enqueue behavior, retry handling for transient database connectivity errors, and readiness checks for both PostgreSQL and Redis.
 
 All sample records are fictional and do not represent government records.
 
@@ -23,11 +23,11 @@ python data/sample/create_fixtures.py
 
 The expected fixture counts are 5 CSV rows, 3 Excel parcel rows, and 3 GeoJSON features. `backend/requirements.txt` contains the pinned runtime stack through the RAG phase, including Pandera, LangGraph/PostgreSQL checkpoints, and the Gemini LangChain integration.
 
-Copy `.env.example` to `.env` if it does not already exist to configure local services. Set `JWT_SECRET_KEY` to a random value of at least 32 characters; do not commit `.env` or user uploads. Database startup, migration, and verification commands are in [`database/README.md`](database/README.md).
+Copy `.env.example` to `.env` if it does not already exist to configure local services. Set `JWT_SECRET_KEY` to a random value of at least 32 characters; do not commit `.env` or user uploads. Database startup, migration, and verification commands are in [`database/README.md`](database/README.md). Redis runs in the same Docker Compose project and is exposed only on localhost by default.
 
 ## Run the API
 
-Start PostgreSQL using the commands in [`database/README.md`](database/README.md), then from the repository root:
+Start PostgreSQL and Redis using the commands in [`database/README.md`](database/README.md), then from the repository root:
 
 ```powershell
 python -m uvicorn app.main:app --app-dir backend --reload
@@ -38,7 +38,7 @@ Open `http://127.0.0.1:8000/docs` for the interactive API documentation. Availab
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/health/live` | Process liveness check |
-| `GET` | `/health/ready` | Database readiness check |
+| `GET` | `/health/ready` | PostgreSQL and Redis readiness check |
 | `POST` | `/api/v1/auth/register` | Create an analyst account and personal workspace |
 | `POST` | `/api/v1/auth/login` | Verify credentials and issue a bearer token |
 | `GET` | `/api/v1/auth/me` | Read the signed-in user's profile |
@@ -47,6 +47,7 @@ Open `http://127.0.0.1:8000/docs` for the interactive API documentation. Availab
 | `POST` | `/api/v1/harmonization/jobs/{job_id}/run` | Harmonize an ingested job and record findings and lineage |
 | `POST` | `/api/v1/quality/jobs/{job_id}/run` | Run canonical-field, land-rule, and PostGIS quality checks |
 | `POST` | `/api/v1/workflows/jobs/{job_id}/run` | Run the checkpointed ingestion → harmonization → QA workflow |
+| `POST` | `/api/v1/workflows/jobs/{job_id}/enqueue` | Queue the checkpointed workflow for a Celery worker (202 response) |
 | `GET` | `/api/v1/workflows/jobs/{job_id}` | Read workflow stage and persisted state summary |
 | `POST` | `/api/v1/knowledge/documents` | Index a workspace-scoped Markdown, TXT, or JSON rules document |
 | `GET` | `/api/v1/knowledge/documents` | List indexed documents in the signed-in workspace |
@@ -86,7 +87,14 @@ After upload, call `POST /api/v1/harmonization/jobs/{job_id}/run` with the same 
 
 Next, call `POST /api/v1/quality/jobs/{job_id}/run`. Pandera checks the canonical field schema; Python rules flag missing identifiers, non-positive areas, and missing owners; PostGIS checks stored geometry validity, emptiness, SRID, and polygon overlaps above one square metre. Findings are persisted with severity and review guidance. Quality execution is recorded and repeat calls return the stored report without duplicating findings. The score is a deterministic review-priority score, not an externally certified land-data rating.
 
-To run the full orchestrated sequence on a newly uploaded job, call `POST /api/v1/workflows/jobs/{job_id}/run`. LangGraph verifies the ingested rows, calls the deterministic harmonization and QA services, and persists checkpoints in PostgreSQL. `GET /api/v1/workflows/jobs/{job_id}` returns the current stage and state summary. This endpoint currently runs synchronously; Redis/Celery background execution is the next workflow milestone. The LangGraph graph does not call Gemini yet, so no paid LLM key is needed for this workflow.
+To run the full orchestrated sequence on a newly uploaded job in the background, first start the Celery worker in a second VS Code terminal from the repository root:
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path backend).Path
+python -m celery -A app.tasks.celery_app:celery_app worker --loglevel=info --pool=solo
+```
+
+`--pool=solo` is a simple local development worker mode. Keep that terminal open. In Swagger, call `POST /api/v1/workflows/jobs/{job_id}/enqueue`; it returns HTTP `202` and a task ID after recording the queued state and publishing the task. `GET /api/v1/workflows/jobs/{job_id}` reports progress and the final result. Repeated enqueue requests while the task is queued or running return the existing task ID instead of creating duplicate work. The synchronous `/run` endpoint remains useful for debugging. Run `docker compose up -d db redis` to start the database and broker, and check `GET /health/ready` for both service connections. The LangGraph graph does not call Gemini yet, so no paid LLM key is needed for this workflow.
 
 ### Index and retrieve land-data rules
 

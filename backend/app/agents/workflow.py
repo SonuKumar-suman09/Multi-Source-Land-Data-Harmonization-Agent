@@ -42,6 +42,7 @@ class LandWorkflowState(TypedDict, total=False):
     workspace_id: str
     user_id: str
     thread_id: str
+    task_id: str | None
     stage: str
     ingestion: dict[str, Any]
     harmonization: dict[str, Any]
@@ -67,6 +68,7 @@ def _record_checkpoint_state(state: LandWorkflowState) -> None:
             db.add(workflow)
         workflow.checkpoint_version = CHECKPOINT_VERSION
         workflow.state_summary = {
+            **(workflow.state_summary or {}),
             "stage": state.get("stage", "unknown"),
             "events": state.get("events", []),
             "ingestion": state.get("ingestion"),
@@ -197,7 +199,10 @@ def _ensure_checkpointer_setup(checkpointer: PostgresSaver) -> None:
             _CHECKPOINTER_SETUP_COMPLETE = True
 
 
-def run_land_workflow(*, job_id: UUID, workspace_id: UUID, user_id: UUID) -> dict[str, Any]:
+def run_land_workflow(
+    *, job_id: UUID, workspace_id: UUID, user_id: UUID, execution_id: UUID | None = None,
+    resume_running: bool = False,
+) -> dict[str, Any]:
     """Run the durable job graph and write an audit/execution summary."""
     thread_id = _thread_id(job_id)
     with SessionLocal.begin() as db:
@@ -211,20 +216,47 @@ def run_land_workflow(*, job_id: UUID, workspace_id: UUID, user_id: UUID) -> dic
         workflow = db.scalar(select(WorkflowState).where(WorkflowState.job_id == job_id))
         if workflow and workflow.state_summary.get("stage") == "completed":
             saved = workflow.state_summary
-            return {
+            result = {
                 "job_id": str(job_id), "status": "completed",
                 "stage": "completed", "events": saved.get("events", []),
+                "task_id": saved.get("task_id"),
                 "ingestion": saved.get("ingestion", {}),
                 "harmonization": saved.get("harmonization", {}),
                 "quality": saved.get("quality", {}), "already_completed": True,
             }
-        execution = AgentExecution(
-            job_id=job_id, agent_name="workflow_orchestrator", status="running",
-            attempt=1, input_summary={"thread_id": thread_id}, started_at=datetime.now(UTC),
-        )
-        db.add(execution)
-        db.flush()
-        execution_id = execution.id
+            if execution_id is not None:
+                execution = db.get(AgentExecution, execution_id)
+                if execution:
+                    execution.status = "completed"
+                    execution.finished_at = datetime.now(UTC)
+                    execution.output_summary = result
+            return result
+        if execution_id is not None:
+            execution = db.get(AgentExecution, execution_id, with_for_update=True)
+            if execution is None:
+                raise LookupError("Workflow execution record not found")
+            if execution.status == "running" and not resume_running:
+                return {
+                    "job_id": str(job_id), "status": "running",
+                    "stage": (workflow.state_summary or {}).get("stage", "running"),
+                    "task_id": str(execution_id), "already_completed": False,
+                }
+            if execution.status == "running" and resume_running:
+                execution.attempt += 1
+            if execution.status == "failed":
+                execution.attempt += 1
+            execution.status = "running"
+            execution.started_at = datetime.now(UTC)
+            execution.error_code = None
+            execution.error_message = None
+        else:
+            execution = AgentExecution(
+                job_id=job_id, agent_name="workflow_orchestrator", status="running",
+                attempt=1, input_summary={"thread_id": thread_id}, started_at=datetime.now(UTC),
+            )
+            db.add(execution)
+            db.flush()
+            execution_id = execution.id
         if workflow is None:
             workflow = WorkflowState(
                 job_id=job_id, graph_thread_id=thread_id,
@@ -241,6 +273,7 @@ def run_land_workflow(*, job_id: UUID, workspace_id: UUID, user_id: UUID) -> dic
     initial_state: LandWorkflowState = {
         "job_id": str(job_id), "workspace_id": str(workspace_id),
         "user_id": str(user_id), "thread_id": thread_id,
+        "task_id": str(execution_id) if execution_id is not None else None,
         "stage": "started", "events": [{"node": "orchestrator", "status": "started"}],
     }
     try:
@@ -250,6 +283,7 @@ def run_land_workflow(*, job_id: UUID, workspace_id: UUID, user_id: UUID) -> dic
             output = graph.invoke(initial_state, {"configurable": {"thread_id": thread_id}})
         result = {
             "job_id": str(job_id), "status": "completed", "stage": output["stage"],
+            "task_id": output.get("task_id"),
             "events": output.get("events", []),
             "ingestion": output.get("ingestion", {}),
             "harmonization": output.get("harmonization", {}),

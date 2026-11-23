@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     app_env: str = "local"
     api_v1_prefix: str = "/api/v1"
     database_url: str = "postgresql+psycopg://land_app:change_me_local_only@127.0.0.1:5433/land_harmonizer"
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    celery_queue: str = "land_workflows"
     embedding_dimensions: int = Field(default=768, ge=1)
     rag_embedding_provider: str = "local"
     gemini_api_key: SecretStr | None = None

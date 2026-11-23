@@ -10,6 +10,7 @@ class WorkflowResponse(BaseModel):
     job_id: UUID
     status: str
     stage: str
+    task_id: str | None = None
     events: list[dict[str, Any]] = Field(default_factory=list)
     ingestion: dict[str, Any] = Field(default_factory=dict)
     harmonization: dict[str, Any] = Field(default_factory=dict)

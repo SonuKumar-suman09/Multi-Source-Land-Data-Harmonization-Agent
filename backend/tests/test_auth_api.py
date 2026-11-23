@@ -88,4 +88,5 @@ def test_health_probes() -> None:
     assert client.get("/health/ready").json() == {
         "status": "ready",
         "database": "connected",
+        "redis": "connected",
     }
