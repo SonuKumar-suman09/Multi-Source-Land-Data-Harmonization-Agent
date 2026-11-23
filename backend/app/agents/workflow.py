@@ -11,6 +11,8 @@ from uuid import UUID
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import RetryPolicy
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 from sqlalchemy import select
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
@@ -280,7 +282,20 @@ def run_land_workflow(
         with PostgresSaver.from_conn_string(_plain_postgres_url()) as checkpointer:
             _ensure_checkpointer_setup(checkpointer)
             graph = build_land_workflow(checkpointer)
-            output = graph.invoke(initial_state, {"configurable": {"thread_id": thread_id}})
+            tracer = trace.get_tracer(__name__)
+            with tracer.start_as_current_span(
+                "land_data.workflow",
+                attributes={"land.job_id": str(job_id), "land.workflow.thread_id": thread_id},
+                record_exception=False,
+                set_status_on_exception=False,
+            ) as span:
+                try:
+                    output = graph.invoke(initial_state, {"configurable": {"thread_id": thread_id}})
+                    span.set_attribute("land.workflow.stage", output.get("stage", "unknown"))
+                except Exception as exc:
+                    span.set_attribute("error.type", type(exc).__name__)
+                    span.set_status(Status(StatusCode.ERROR))
+                    raise
         result = {
             "job_id": str(job_id), "status": "completed", "stage": output["stage"],
             "task_id": output.get("task_id"),

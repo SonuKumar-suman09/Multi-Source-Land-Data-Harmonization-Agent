@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     gemini_embedding_model: str = "gemini-embedding-001"
     gemini_chat_model: str = "gemini-3.5-flash-lite"
+    otel_exporter_otlp_endpoint: str | None = None
+    otel_service_name: str = "land-data-harmonization-agent"
+    langfuse_public_key: SecretStr | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_base_url: str | None = None
     jwt_secret_key: str = "replace_with_a_random_secret_before_running_auth"
     jwt_access_token_minutes: int = Field(default=30, ge=1, le=1440)
     frontend_origins: str = "http://localhost:5173"

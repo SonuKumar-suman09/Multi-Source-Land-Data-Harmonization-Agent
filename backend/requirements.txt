@@ -8,10 +8,17 @@ geopandas==1.2.0
 GeoAlchemy2==0.20.0
 langchain==1.5.2
 langchain-google-genai==4.5.2
+langfuse==5.2.0
 langgraph==1.2.24
 langgraph-checkpoint-postgres==3.2.1
 minio==7.2.20
 numpy==2.5.5
+opentelemetry-exporter-otlp-proto-http==1.45.2
+opentelemetry-instrumentation-celery==0.66b2
+opentelemetry-instrumentation-fastapi==0.66b2
+opentelemetry-instrumentation-redis==0.66b2
+opentelemetry-instrumentation-sqlalchemy==0.66b2
+opentelemetry-sdk==1.45.2
 openpyxl==3.1.5
 pandera==0.36.0
 pandas==3.1.1

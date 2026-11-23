@@ -16,6 +16,7 @@ from app.api.quality import router as quality_router
 from app.api.reports import router as reports_router
 from app.api.workflows import router as workflows_router
 from app.core.config import settings
+from app.core.telemetry import configure_telemetry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,3 +47,4 @@ app.include_router(quality_router, prefix=settings.api_v1_prefix)
 app.include_router(reports_router, prefix=settings.api_v1_prefix)
 app.include_router(workflows_router, prefix=settings.api_v1_prefix)
 app.include_router(health_router)
+configure_telemetry(app)

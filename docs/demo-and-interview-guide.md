@@ -55,7 +55,7 @@ It is a deterministic review-priority score based on recorded checks. It is not 
 The API derives allowed workspaces from the authenticated user's membership and returns 404 for jobs outside those workspaces. Integration tests cover JSON/CSV/PDF report isolation and CSV formula-prefix escaping.
 
 **10. What would you improve before production?**  
-Add stronger account administration/refresh-token lifecycle, backup/restore drills, and connected OpenTelemetry/Langfuse traces. Keep those claims separate from current implemented behavior.
+Add stronger account administration/refresh-token lifecycle, backup/restore drills, and operational MinIO provisioning/credential rotation. Configure OTLP and Langfuse credentials only for a deployment that has approved telemetry destinations.
 
 ## Resume-ready description
 
@@ -74,6 +74,6 @@ The React dashboard lets an analyst upload a batch, review actual quality counts
 - Gemini chat suggestions are optional and require explicit header-sharing consent; the deterministic and manual mapping flow works without a Gemini key.
 - Original uploads can use local storage (default) or a configured MinIO endpoint; deployment and credential rotation still need operational setup.
 - Knowledge documents can be indexed and searched through the authenticated API or the dashboard Knowledge base page.
-- Langfuse and OpenTelemetry are not connected in this build.
+- OpenTelemetry and Langfuse callbacks are implemented but optional; without endpoints and keys, they remain off. Langfuse only sees Gemini schema suggestion calls made after header-sharing consent.
 - The project is a strong local demonstration, not a land-title authority or production deployment for legal decisions.
 

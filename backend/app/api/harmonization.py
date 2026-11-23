@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.config import settings
+from app.core.telemetry import langfuse_callback_handler
 from app.models.entities import AuditLog, JobStatus, ProcessingJob, SchemaMapping, UploadedFile, User, WorkspaceMembership
 from app.schemas.harmonization import HarmonizationResponse
 from app.services.harmonization import ALIASES, harmonize_job, map_columns, mapping_review_complete
@@ -85,7 +86,9 @@ def propose_mappings(job_id: UUID, payload: MappingProposalRequest, user: User =
             "If uncertain, set canonical_field to unmapped and confidence to 0. "
             "Input contains header names only; do not infer values or invent records. Return the original file_index and source_column. Headers: " + str(headers)
         )
-        output = structured.invoke(prompt)
+        callback = langfuse_callback_handler()
+        invoke_config = {"callbacks": [callback]} if callback is not None else {}
+        output = structured.invoke(prompt, config=invoke_config)
         suggestions = [item.model_dump() for item in output.mappings]
         allowed = set(CANONICAL_FIELDS) | {"unmapped"}
         for item in suggestions:

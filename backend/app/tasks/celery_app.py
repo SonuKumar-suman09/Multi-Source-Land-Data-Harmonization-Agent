@@ -1,8 +1,10 @@
 """Celery application configured for durable Redis-backed job execution."""
 
 from celery import Celery
+from celery.signals import worker_process_init
 
 from app.core.config import settings
+from app.core.telemetry import configure_telemetry
 
 celery_app = Celery(
     "land_harmonizer",
@@ -26,3 +28,9 @@ celery_app.conf.update(
     task_soft_time_limit=3540,
     task_time_limit=3600,
 )
+
+
+@worker_process_init.connect
+def configure_worker_observability(**_: object) -> None:
+    """Initialize exporters after Celery forks a worker child process."""
+    configure_telemetry(service_name=f"{settings.otel_service_name}-worker")
