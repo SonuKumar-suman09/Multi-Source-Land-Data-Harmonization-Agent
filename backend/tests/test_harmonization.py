@@ -83,6 +83,24 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
         )
         assert upload.status_code == 201, upload.text
         job_id = UUID(upload.json()["job_id"])
+        schema = client.get(f"/api/v1/harmonization/jobs/{job_id}/schema", headers=headers)
+        assert schema.status_code == 200, schema.text
+        decisions = [
+            {
+                "uploaded_file_id": file["uploaded_file_id"],
+                "source_column": column["source_column"],
+                "canonical_field": column["canonical_field"],
+            }
+            for file in schema.json()["files"]
+            for column in file["columns"]
+        ]
+        reviewed = client.put(
+            f"/api/v1/harmonization/jobs/{job_id}/mapping-decisions",
+            headers=headers,
+            json={"decisions": decisions},
+        )
+        assert reviewed.status_code == 200, reviewed.text
+        assert reviewed.json()["saved_columns"] == len(decisions)
         response = client.post(f"/api/v1/harmonization/jobs/{job_id}/run", headers=headers)
         assert response.status_code == 200, response.text
         summary = response.json()

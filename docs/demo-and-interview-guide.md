@@ -16,7 +16,7 @@
    - `source_a.csv`
    - `source_b.xlsx`
    - `source_c.geojson`
-4. Upload and harmonize. Wait for the Celery worker to finish processing. Explain that the files contain synthetic missing values, duplicates, area conflicts, and an invalid coordinate on purpose.
+4. Review the detected source columns, accept or change the proposed canonical fields, and select **Approve mappings & process**. Gemini suggestions are optional; only request them after consenting to send header names. Explain that the fixtures contain synthetic missing values, duplicates, area conflicts, and an invalid coordinate on purpose.
 5. On **Overview**, point out real persisted dataset/record counts and review status; the application does not fill the charts with invented demo metrics.
 6. On **Parcel map**, filter valid or invalid features, select a record, and inspect stored attributes. Invalid or missing geometry is not drawn as a valid parcel.
 7. On **Reports & audit**, show the source file hashes/metadata, findings, recorded workflow events, and download both CSV and PDF. The CSV carries original source data and transformation history for traceability.
@@ -40,7 +40,7 @@ LangGraph stores a typed job state and coordinates ingestion verification, harmo
 Workspace rule documents are split into chunks and indexed in PostgreSQL with pgvector embeddings. QA retrieves relevant chunks and records their references. Local hashing embeddings support offline tests; Gemini embeddings are optional. Retrieved guidance does not silently rewrite source records.
 
 **5. How do you handle schema mapping?**  
-Known aliases map deterministically to canonical field names. If two columns compete for the same field or no safe alias exists, the mapping is not silently chosen; the finding remains for review. Gemini chat-based mapping proposals and an approval screen are future work.
+Known aliases are proposed deterministically and shown for a person to approve. Unmatched headers can be mapped manually or left unmapped. If the user consents and configures a Gemini key, the optional chat model receives header names only and returns advisory proposals; the person still chooses which fields are accepted. Cell values and owner names are not sent to Gemini.
 
 **6. How does spatial normalization work?**  
 The service reads the declared source CRS, transforms geometry to EPSG:4326 with PyProj/Shapely, checks bounds and validity, and stores valid geometry as a PostGIS geometry. The map API returns filtered GeoJSON from stored geometries.
@@ -55,7 +55,7 @@ It is a deterministic review-priority score based on recorded checks. It is not 
 The API derives allowed workspaces from the authenticated user's membership and returns 404 for jobs outside those workspaces. Integration tests cover JSON/CSV/PDF report isolation and CSV formula-prefix escaping.
 
 **10. What would you improve before production?**  
-Add a human schema-mapping approval workflow, stronger account administration/refresh-token lifecycle, object storage such as MinIO, backup/restore drills, and connected OpenTelemetry/Langfuse traces. Keep those claims separate from current implemented behavior.
+Add stronger account administration/refresh-token lifecycle, object storage such as MinIO, backup/restore drills, and connected OpenTelemetry/Langfuse traces. Keep those claims separate from current implemented behavior.
 
 ## Resume-ready description
 
@@ -71,8 +71,7 @@ The React dashboard lets an analyst upload a batch, review actual quality counts
 
 ## Scope to state clearly in a presentation
 
-- Gemini is optional and currently used for embeddings only; the workflow does not call a Gemini chat model to choose ambiguous mappings.
-- Ambiguous mappings become review findings, but a dedicated mapping approval screen/action is not implemented yet.
+- Gemini chat suggestions are optional and require explicit header-sharing consent; the deterministic and manual mapping flow works without a Gemini key.
 - Knowledge documents can be indexed and searched through the authenticated API or the dashboard Knowledge base page.
 - MinIO, Langfuse, and OpenTelemetry are architecture options, not connected services in the current local stack.
 - The project is a strong local demonstration, not a land-title authority or production deployment for legal decisions.

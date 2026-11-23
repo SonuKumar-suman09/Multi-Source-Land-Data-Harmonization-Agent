@@ -52,6 +52,7 @@ services:
       RAG_EMBEDDING_PROVIDER: ${RAG_EMBEDDING_PROVIDER:-local}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-3.5-flash-lite}
     depends_on:
       db:
         condition: service_healthy

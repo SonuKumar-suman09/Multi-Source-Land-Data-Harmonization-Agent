@@ -185,6 +185,20 @@ a { color: inherit; text-decoration: none; }
 .file-ok { color: #5b9b73; }
 .file-remove { display: grid; width: 25px; height: 25px; place-items: center; border: 0; border-radius: 5px; color: #9ba6a0; background: transparent; }
 .file-remove:hover { color: #a9564a; background: #fbefed; }
+.mapping-review { margin-top: 17px; padding: 15px; border: 1px solid #e2ebe5; border-radius: 9px; background: #fbfdfb; }
+.mapping-review .panel-heading { margin-bottom: 8px; }
+.mapping-review .panel-heading h2 { margin-top: 4px; }
+.mapping-privacy { margin: 0 0 9px; color: #7d8b83; font-size: 10px; line-height: 1.5; }
+.consent-row { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; color: #65746c; font-size: 10px; }
+.consent-row input { accent-color: #267b64; }
+.mapping-file { margin-top: 13px; padding-top: 10px; border-top: 1px solid #e9eeeb; }
+.mapping-file > b { display: block; margin-bottom: 6px; color: #405349; font-size: 10px; }
+.mapping-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid #eff2f0; }
+.mapping-row > span { display: grid; gap: 3px; min-width: 0; }
+.mapping-row > span b { overflow-wrap: anywhere; color: #53645a; font-size: 10px; font-weight: 550; }
+.mapping-row > span small { color: #98a39c; font-size: 9px; }
+.mapping-select { width: min(220px, 48%); height: 32px; border: 1px solid #dfe7e2; border-radius: 6px; padding: 0 8px; color: #506259; background: white; font-size: 10px; }
+.mapping-submit { margin-top: 14px; }
 .progress-block { margin-top: 15px; }
 .progress-block > div:first-child { display: flex; justify-content: space-between; color: #77867e; font-size: 9px; }
 .progress-block b { color: #416e58; }

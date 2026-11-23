@@ -204,6 +204,7 @@ class SchemaMapping(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("processing_jobs.id", ondelete="CASCADE"), nullable=False)
     source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("data_sources.id", ondelete="CASCADE"), nullable=False)
+    uploaded_file_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("uploaded_files.id", ondelete="CASCADE"), index=True)
     source_column: Mapped[str] = mapped_column(String(255), nullable=False)
     canonical_field: Mapped[str] = mapped_column(String(100), nullable=False)
     confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3))

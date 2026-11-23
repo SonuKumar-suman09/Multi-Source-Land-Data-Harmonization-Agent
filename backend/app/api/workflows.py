@@ -12,6 +12,7 @@ from app.agents.workflow import run_land_workflow
 from app.api.deps import get_current_user, get_db
 from app.models.entities import ProcessingJob, User, WorkflowState, WorkspaceMembership
 from app.schemas.workflow import WorkflowResponse, WorkflowStatusResponse
+from app.services.harmonization import mapping_review_complete
 from app.tasks.workflows import WorkflowQueueUnavailable, enqueue_land_workflow
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,8 @@ def run_workflow(
     db: Session = Depends(get_db),
 ) -> WorkflowResponse:
     job = _workspace_job(db, job_id, user.id)
+    if not mapping_review_complete(db, job.id):
+        raise HTTPException(status_code=409, detail="Review and save every source-column mapping before processing")
     job_workspace_id = job.workspace_id
     actor_id = user.id
     # The request session's read transaction must not block LangGraph's first-time
@@ -64,6 +67,8 @@ def enqueue_workflow(
     db: Session = Depends(get_db),
 ) -> WorkflowResponse:
     job = _workspace_job(db, job_id, user.id)
+    if not mapping_review_complete(db, job.id):
+        raise HTTPException(status_code=409, detail="Review and save every source-column mapping before processing")
     workspace_id = job.workspace_id
     actor_id = user.id
     db.rollback()

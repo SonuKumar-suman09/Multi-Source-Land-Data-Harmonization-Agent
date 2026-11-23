@@ -201,6 +201,10 @@ function UploadPage() {
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [schemaReview, setSchemaReview] = useState(null);
+  const [mappingChoices, setMappingChoices] = useState({});
+  const [allowGemini, setAllowGemini] = useState(false);
+  const [suggestionBusy, setSuggestionBusy] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const pickFiles = (incoming) => {
@@ -217,16 +221,54 @@ function UploadPage() {
     setError(""); setResult(null); setProgress(0); setBusy(true);
     try {
       const uploaded = await uploadFiles({ files, sourceName: sourceName.trim(), onProgress: setProgress });
-      let queued = null;
-      try { queued = await apiRequest(`/api/v1/workflows/jobs/${uploaded.job_id}/enqueue`, { method: "POST" }); }
-      catch (queueError) { setError(`Files were uploaded successfully, but workflow queueing failed: ${queueError.message}`); }
-      setResult({ ...uploaded, queued });
+      const review = await apiRequest(`/api/v1/harmonization/jobs/${uploaded.job_id}/schema`);
+      setSchemaReview(review);
+      const initial = {};
+      review.files.forEach((file) => file.columns.forEach((column) => {
+        initial[`${file.uploaded_file_id}:${column.source_column}`] = column.canonical_field || "";
+      }));
+      setMappingChoices(initial);
+      setResult({ ...uploaded, queued: null });
       setFiles([]);
     } catch (uploadError) {
       setError(uploadError.message);
     } finally {
       setBusy(false);
     }
+  };
+  const requestSuggestions = async () => {
+    if (!allowGemini || !result) return;
+    setSuggestionBusy(true); setError("");
+    try {
+      const response = await apiRequest(`/api/v1/harmonization/jobs/${result.job_id}/mapping-proposals`, { method: "POST", body: JSON.stringify({ consent_to_send_headers: true }) });
+      setMappingChoices((current) => {
+        const next = { ...current };
+        response.mappings.forEach((item) => {
+          const file = schemaReview.files[item.file_index];
+          if (file && file.columns.some((column) => column.source_column === item.source_column) && item.canonical_field !== "unmapped") {
+            next[`${file.uploaded_file_id}:${item.source_column}`] = item.canonical_field;
+          }
+        });
+        return next;
+      });
+    } catch (proposalError) { setError(proposalError.message); }
+    finally { setSuggestionBusy(false); }
+  };
+  const approveMappings = async () => {
+    if (!result || !schemaReview) return;
+    setBusy(true); setError("");
+    try {
+      const decisions = schemaReview.files.flatMap((file) => file.columns.map((column) => ({
+        uploaded_file_id: file.uploaded_file_id,
+        source_column: column.source_column,
+        canonical_field: mappingChoices[`${file.uploaded_file_id}:${column.source_column}`] || null,
+      })));
+      await apiRequest(`/api/v1/harmonization/jobs/${result.job_id}/mapping-decisions`, { method: "PUT", body: JSON.stringify({ decisions }) });
+      const queued = await apiRequest(`/api/v1/workflows/jobs/${result.job_id}/enqueue`, { method: "POST" });
+      setResult((current) => ({ ...current, queued }));
+      setSchemaReview(null);
+    } catch (processError) { setError(processError.message); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -235,15 +277,16 @@ function UploadPage() {
       <div className="upload-layout"><form className="panel upload-panel" onSubmit={submit}><div className="form-section-title"><span className="form-step">01</span><div><b>Source details</b><small>Help your team identify this batch later.</small></div></div>
         <label className="field-label">Source or batch name<input className="text-input" value={sourceName} onChange={(event) => setSourceName(event.target.value)} placeholder="e.g. North district parcel register" maxLength={200} /></label>
         <div className="form-section-title files-title"><span className="form-step">02</span><div><b>Select source files</b><small>Original files are preserved unchanged.</small></div></div>
-        <div className={`dropzone ${dragging ? "dropzone-active" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); pickFiles(event.dataTransfer.files); }} onClick={() => document.getElementById("dataset-files")?.click()} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") document.getElementById("dataset-files")?.click(); }}>
+        {!result && <div className={`dropzone ${dragging ? "dropzone-active" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); pickFiles(event.dataTransfer.files); }} onClick={() => document.getElementById("dataset-files")?.click()} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") document.getElementById("dataset-files")?.click(); }}>
           <input id="dataset-files" type="file" multiple accept=".csv,.xlsx,.xls,.json,.geojson,.zip" onChange={(event) => pickFiles(event.target.files)} hidden />
           <div className="drop-icon"><Upload size={21} /></div><b>Drop files here, or <span>browse</span></b><p>CSV · Excel · JSON · GeoJSON · Zipped Shapefile</p><small>Maximum combined upload size: 100 MB</small>
-        </div>
+        </div>}
         {files.length > 0 && <div className="selected-files"><div className="selected-files-heading">{files.length} file{files.length > 1 ? "s" : ""} selected<button type="button" onClick={() => setFiles([])}>Remove all</button></div>{files.map((file, index) => <div className="file-row" key={`${file.name}-${index}`}><span className="file-type">{file.name.split(".").pop().slice(0, 4).toUpperCase()}</span><span className="file-row-name"><b>{file.name}</b><small>{formatBytes(file.size)}</small></span><Check size={16} className="file-ok" /><button type="button" className="file-remove" aria-label={`Remove ${file.name}`} onClick={(event) => { event.stopPropagation(); setFiles((current) => current.filter((_, row) => row !== index)); }}><X size={15} /></button></div>)}</div>}
         {busy && <div className="progress-block"><div><span>{progress < 100 ? "Uploading original files" : "Queueing workflow"}</span><b>{progress}%</b></div><div className="progress-track"><span style={{ width: `${Math.max(progress, progress === 100 ? 100 : 4)}%` }} /></div></div>}
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
-        {result && <InlineNotice tone={result.queued ? "success" : "warning"}>{result.files.length} file(s) uploaded ({result.total_records} source rows). {result.queued ? `Workflow queued · ${result.job_id.slice(0, 8)}…` : "Upload is saved; queue the workflow from the overview when the worker is available."}</InlineNotice>}
-        <div className="upload-actions"><span><ShieldCheck size={15} /> Source files remain unchanged</span><button className="button button-primary" disabled={busy || !files.length}><Upload size={16} />{busy ? "Processing upload…" : "Upload and harmonize"}<ArrowRight size={15} /></button></div>
+        {result && <InlineNotice tone={result.queued ? "success" : "warning"}>{result.files.length} file(s) uploaded ({result.total_records} source rows). {result.queued ? `Workflow queued · ${result.job_id.slice(0, 8)}…` : "Review each column mapping below. Processing starts after you approve."}</InlineNotice>}
+        {schemaReview && <section className="mapping-review"><div className="panel-heading"><div><span className="panel-kicker">HUMAN REVIEW</span><h2>Confirm column mappings</h2></div></div><p className="mapping-privacy">Only column headers are sent to Gemini when you request suggestions. No record values or owner names are sent.</p><label className="consent-row"><input type="checkbox" checked={allowGemini} onChange={(event) => setAllowGemini(event.target.checked)} /> I agree to send column headers to Gemini for mapping suggestions.</label><button type="button" className="button button-outline" disabled={!allowGemini || suggestionBusy} onClick={requestSuggestions}><Sparkles size={15} />{suggestionBusy ? "Getting suggestions…" : "Suggest with Gemini"}</button>{schemaReview.files.map((file) => <div className="mapping-file" key={file.uploaded_file_id}><b>{file.filename}</b>{file.columns.map((column) => <label className="mapping-row" key={column.source_column}><span><b>{column.source_column}</b><small>{column.suggested_field ? `Suggested: ${column.suggested_field}` : "No automatic match"}</small></span><select className="mapping-select" value={mappingChoices[`${file.uploaded_file_id}:${column.source_column}`] || ""} onChange={(event) => setMappingChoices((current) => ({ ...current, [`${file.uploaded_file_id}:${column.source_column}`]: event.target.value }))}><option value="">Leave unmapped</option>{schemaReview.canonical_fields.map((field) => <option value={field} key={field}>{field}</option>)}</select></label>)}</div>)}<button type="button" className="button button-primary mapping-submit" disabled={busy} onClick={approveMappings}><ShieldCheck size={15} />{busy ? "Saving and starting…" : "Approve mappings & process"}<ArrowRight size={15} /></button></section>}
+        <div className="upload-actions"><span><ShieldCheck size={15} /> Source files remain unchanged</span>{!result && <button className="button button-primary" disabled={busy || !files.length}><Upload size={16} />{busy ? "Uploading files…" : "Upload and review"}<ArrowRight size={15} /></button>}</div>
       </form>
       <aside className="upload-aside"><div className="panel source-guide"><div className="guide-icon"><Globe2 size={18} /></div><span className="panel-kicker">WHAT HAPPENS NEXT</span><h3>One upload. A reviewable workflow.</h3><ol><li><span>1</span><div><b>Files are inspected</b><small>Format, columns, and row counts are recorded.</small></div></li><li><span>2</span><div><b>Records are harmonized</b><small>Known aliases map to the common land schema.</small></div></li><li><span>3</span><div><b>Quality checks run</b><small>Findings and source lineage remain attached.</small></div></li></ol><div className="guide-foot"><ShieldCheck size={14} /> Critical values are never silently rewritten.</div></div><div className="upload-tip"><div className="tip-icon"><Sparkles size={16} /></div><div><b>More context improves mapping</b><p>Use a clear source name. For Shapefiles, include the matching .shp, .shx, and .dbf files in one ZIP.</p></div></div></aside></div>
     </>

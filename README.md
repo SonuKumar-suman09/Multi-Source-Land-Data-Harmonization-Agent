@@ -10,7 +10,7 @@ Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture
 
 Phase 13 adds workspace-scoped JSON, CSV, and PDF reports for each processing job, including source-file provenance, agent execution history, audit events, validation findings, record counts, duplicate counts, and quality score. The React **Reports & audit** page selects a recent job and downloads its CSV or PDF. Phase 14 adds integration and security tests for report downloads, spreadsheet formula escaping, and workspace isolation. Phase 15 packages the database, API, Celery worker, and React dashboard as a Docker Compose application with health checks, ordered migrations, persistent local data volumes, and a same-origin Nginx API proxy. Phase 16 adds architecture and ER diagrams, an API reference, a demo walkthrough, interview Q&A, and a resume-ready project description.
 
-The dashboard also provides a Knowledge base page, Agent activity view, and Data quality review page. The design roadmap still includes capabilities that are not implemented yet. Current limits are listed in [`docs/demo-and-interview-guide.md`](docs/demo-and-interview-guide.md); in particular, Gemini chat-based mapping proposals and approval, MinIO, Langfuse, and OpenTelemetry are future work. Do not describe these as completed features in a presentation.
+The dashboard also provides a Knowledge base page, Agent activity view, and Data quality review page. Uploaded columns can be mapped deterministically or reviewed manually before a workflow starts. Gemini mapping suggestions are optional and require explicit consent; only header names are sent, never record cell values. MinIO, Langfuse, and OpenTelemetry are not integrated yet. Current limits are listed in [`docs/demo-and-interview-guide.md`](docs/demo-and-interview-guide.md); do not describe those optional integrations as completed features in a presentation.
 
 Project presentation materials:
 
@@ -120,7 +120,7 @@ The response includes a job ID, file IDs, detected formats, SHA-256 hashes, row 
 
 ### Harmonize an ingested job
 
-After upload, call `POST /api/v1/harmonization/jobs/{job_id}/run` with the same bearer token. Exact normalized aliases are mapped deterministically; duplicate aliases for a canonical field are marked for review. Area values are converted only when their source column or declared metadata identifies the unit. Geometry is transformed with PyProj into EPSG:4326; invalid or out-of-bounds geometry is flagged and omitted from the canonical geometry column. Ambiguous dates and missing or invalid area values are retained in the raw row and generate findings for review. Duplicate plot IDs are recorded as candidate pairs, and disagreements in owner or area mark both records as conflicts. Every output record links back to its raw row and mapping/transformation history. The endpoint returns record counts, duplicate pairs, findings, and a summary quality score; running it a second time returns `409` to avoid duplicate output rows.
+After upload, inspect `GET /api/v1/harmonization/jobs/{job_id}/schema`. Save the user's explicit selections with `PUT /api/v1/harmonization/jobs/{job_id}/mapping-decisions`, then queue `POST /api/v1/workflows/jobs/{job_id}/enqueue`. The optional `POST /api/v1/harmonization/jobs/{job_id}/mapping-proposals` endpoint requires `{ "consent_to_send_headers": true }` and `GEMINI_API_KEY`; it sends only column headers, not file names, values, or owner names. Exact normalized aliases are proposed deterministically; a person approves every field before processing. Area values are converted only when their source column or declared metadata identifies the unit. Geometry is transformed with PyProj into EPSG:4326; invalid or out-of-bounds geometry is flagged and omitted from the canonical geometry column. Ambiguous dates and missing or invalid area values are retained in the raw row and generate findings for review. Duplicate plot IDs are recorded as candidate pairs, and disagreements in owner or area mark both records as conflicts. Every output record links back to its raw row and mapping/transformation history. The endpoint returns record counts, duplicate pairs, findings, and a summary quality score; running it a second time returns `409` to avoid duplicate output rows.
 
 Next, call `POST /api/v1/quality/jobs/{job_id}/run`. Pandera checks the canonical field schema; Python rules flag missing identifiers, non-positive areas, and missing owners; PostGIS checks stored geometry validity, emptiness, SRID, and polygon overlaps above one square metre. Findings are persisted with severity and review guidance. Quality execution is recorded and repeat calls return the stored report without duplicating findings. The score is a deterministic review-priority score, not an externally certified land-data rating.
 
@@ -153,7 +153,7 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL shown in the terminal (normally `http://localhost:5173`). Register an account or sign in, then upload a synthetic source batch. The overview reads actual workspace-scoped counts from `/api/v1/dashboard/summary`; it does not fill empty states with sample metrics. Uploaded files are sent to the FastAPI ingestion endpoint and then queued for the Celery workflow. `VITE_API_URL` can override the API base URL when it is not `http://127.0.0.1:8000`.
+Open the Vite URL shown in the terminal (normally `http://localhost:5173`). Register an account or sign in, then upload a synthetic source batch. Review the proposed mappings and approve them before starting the Celery workflow. The overview reads actual workspace-scoped counts from `/api/v1/dashboard/summary`; it does not fill empty states with sample metrics. `VITE_API_URL` can override the API base URL when it is not `http://127.0.0.1:8000`.
 
 The **Parcel map** view requests valid stored geometries from `/api/v1/map/parcels` as GeoJSON, then draws them with Leaflet. Search by plot or landholder, filter by harmonized record status, select a parcel to inspect its stored attributes, and zoom to it from the parcel list. The API can also accept a complete WGS84 bounding box with `min_lon`, `min_lat`, `max_lon`, and `max_lat`; partial or inverted bounds are rejected. OpenStreetMap tiles include the required attribution; review the [Leaflet map and tile guidance](https://leafletjs.com/examples/quick-start/) before changing tile providers or using this demo in production.
 
@@ -172,6 +172,7 @@ The default `RAG_EMBEDDING_PROVIDER=local` mode works offline without a paid API
 ```env
 RAG_EMBEDDING_PROVIDER=gemini
 GEMINI_API_KEY=your_key_here
+GEMINI_CHAT_MODEL=gemini-3.5-flash-lite
 GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 ```
 

@@ -71,6 +71,21 @@ def map_columns(columns: list[str]) -> tuple[dict[str, str], dict[str, str]]:
     return mapped, ambiguous
 
 
+def mapping_review_complete(db: Session, job_id: UUID) -> bool:
+    """Return true only when each uploaded header has a stored human decision."""
+    files = db.scalars(select(UploadedFile).where(UploadedFile.job_id == job_id)).all()
+    expected = {(file.id, column) for file in files for column in file.metadata_json.get("columns", [])}
+    if not expected:
+        return False
+    rows = db.scalars(select(SchemaMapping).where(SchemaMapping.job_id == job_id)).all()
+    actual = {
+        (entry.uploaded_file_id, entry.source_column)
+        for entry in rows
+        if entry.status in {"accepted_human", "accepted_deterministic", "rejected"}
+    }
+    return actual == expected
+
+
 def _area(value: Any, source_column: str, declared_unit: str | None) -> tuple[Decimal | None, str | None]:
     if value is None or str(value).strip() == "":
         return None, "Area is missing"
@@ -171,17 +186,40 @@ def harmonize_job(db: Session, *, job_id: UUID, workspace_id: UUID, user_id: UUI
     findings = 0
     for uploaded in files:
         rows = db.scalars(select(RawLandRecord).where(RawLandRecord.uploaded_file_id == uploaded.id).order_by(RawLandRecord.row_number)).all()
-        mapped, ambiguous = map_columns(uploaded.metadata_json.get("columns", []))
+        saved_mappings = db.scalars(
+            select(SchemaMapping).where(
+                SchemaMapping.job_id == job_id,
+                SchemaMapping.uploaded_file_id == uploaded.id,
+            )
+        ).all()
+        if saved_mappings:
+            accepted = {
+                entry.source_column: entry.canonical_field
+                for entry in saved_mappings
+                if entry.status in {"accepted_human", "accepted_deterministic"}
+                and entry.canonical_field in ALIASES
+            }
+            mapped, ambiguous = accepted, {}
+        else:
+            mapped, ambiguous = map_columns(uploaded.metadata_json.get("columns", []))
         mappings: dict[str, UUID] = {}
         source_id = uploaded.source_id
-        for column in uploaded.metadata_json.get("columns", []):
-            canonical = mapped.get(column) or ambiguous.get(column)
-            if canonical:
-                decision = "accepted_deterministic" if column in mapped else "review_required"
-                entry = SchemaMapping(job_id=job_id, source_id=source_id, source_column=column, canonical_field=canonical, confidence=Decimal("1.000") if column in mapped else None, evidence={"method": "exact_normalized_alias", "source_format": uploaded.detected_format}, status=decision)
-                db.add(entry)
-                if column in mapped:
-                    mappings[canonical] = entry.id
+        if saved_mappings:
+            mappings = {
+                entry.canonical_field: entry.id
+                for entry in saved_mappings
+                if entry.status in {"accepted_human", "accepted_deterministic"}
+                and entry.canonical_field in ALIASES
+            }
+        else:
+            for column in uploaded.metadata_json.get("columns", []):
+                canonical = mapped.get(column) or ambiguous.get(column)
+                if canonical:
+                    decision = "accepted_deterministic" if column in mapped else "review_required"
+                    entry = SchemaMapping(job_id=job_id, source_id=source_id, uploaded_file_id=uploaded.id, source_column=column, canonical_field=canonical, confidence=Decimal("1.000") if column in mapped else None, evidence={"method": "exact_normalized_alias", "source_format": uploaded.detected_format}, status=decision)
+                    db.add(entry)
+                    if column in mapped:
+                        mappings[canonical] = entry.id
         db.flush()
         metadata = uploaded.metadata_json
         declared_unit = metadata.get("default_area_unit")
