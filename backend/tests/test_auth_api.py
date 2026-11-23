@@ -54,6 +54,8 @@ def test_auth_register_login_and_protected_profile() -> None:
         assert protected_dashboard.status_code == 401
         protected_map = client.get("/api/v1/map/parcels")
         assert protected_map.status_code == 401
+        protected_report = client.get(f"/api/v1/reports/jobs/{uuid4()}")
+        assert protected_report.status_code == 401
 
         invalid_token = client.get(
             "/api/v1/auth/me",

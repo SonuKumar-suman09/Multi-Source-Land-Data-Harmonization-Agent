@@ -157,6 +157,29 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
         assert rerun_workflow.status_code == 200
         assert rerun_workflow.json()["already_completed"] is True
 
+        processing_report = client.get(f"/api/v1/reports/jobs/{job_id}", headers=headers)
+        assert processing_report.status_code == 200, processing_report.text
+        report_data = processing_report.json()
+        assert report_data["total_records"] == 11
+        assert report_data["harmonized_records"] == 11
+        assert report_data["quality_score"] is not None
+        assert report_data["source_files"]
+        assert report_data["agent_executions"]
+        assert {event["action"] for event in report_data["audit_events"]} >= {
+            "dataset.ingested", "dataset.harmonized", "dataset.quality_assured"
+        }
+
+        csv_report = client.get(f"/api/v1/reports/jobs/{job_id}/csv", headers=headers)
+        assert csv_report.status_code == 200
+        assert "text/csv" in csv_report.headers["content-type"]
+        assert "transformation_history_json" in csv_report.text
+        assert len(csv_report.text.splitlines()) >= 12
+
+        pdf_report = client.get(f"/api/v1/reports/jobs/{job_id}/pdf", headers=headers)
+        assert pdf_report.status_code == 200
+        assert pdf_report.headers["content-type"] == "application/pdf"
+        assert pdf_report.content.startswith(b"%PDF-")
+
         with SessionLocal() as db:
             records = db.scalars(select(HarmonizedLandRecord).where(HarmonizedLandRecord.job_id == job_id)).all()
             assert len(records) == 11
