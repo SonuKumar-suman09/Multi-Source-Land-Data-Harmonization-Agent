@@ -125,6 +125,7 @@ function ProtectedLayout({ user, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const location = useLocation();
+  const pageTitle = ({ "/upload": "Upload datasets", "/map": "Parcel map", "/reports": "Reports & audit", "/knowledge": "Knowledge base", "/agents": "Agent activity", "/quality": "Data quality" })[location.pathname] || "Overview";
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
@@ -142,7 +143,7 @@ function ProtectedLayout({ user, onLogout }) {
       </aside>
       {mobileNav && <button className="nav-scrim" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
       <main className="main-shell">
-        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-sep">/</span><b>{location.pathname === "/upload" ? "Upload datasets" : location.pathname === "/map" ? "Parcel map" : location.pathname === "/reports" ? "Reports & audit" : location.pathname === "/knowledge" ? "Knowledge base" : "Overview"}</b></div><div className="topbar-right"><div className="api-indicator"><span className="api-dot" /> Workspace metrics</div><button className="top-avatar" title={user.email}>{user.email?.slice(0, 1).toUpperCase()}</button></div></header>
+        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-sep">/</span><b>{pageTitle}</b></div><div className="topbar-right"><div className="api-indicator"><span className="api-dot" /> Workspace metrics</div><button className="top-avatar" title={user.email}>{user.email?.slice(0, 1).toUpperCase()}</button></div></header>
         <div className="page-content"><Outlet /></div>
       </main>
     </div>
