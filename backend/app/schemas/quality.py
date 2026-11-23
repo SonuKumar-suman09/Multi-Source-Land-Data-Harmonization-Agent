@@ -1,6 +1,7 @@
 """Quality assurance report response."""
 
 from uuid import UUID
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -17,4 +18,5 @@ class QualityReportResponse(BaseModel):
     informational_issues: int
     overlapping_pairs: int
     quality_score: float
+    retrieved_rules: list[dict[str, Any]]
     already_completed: bool

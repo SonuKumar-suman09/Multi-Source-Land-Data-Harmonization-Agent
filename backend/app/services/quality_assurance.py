@@ -24,6 +24,7 @@ from app.models.entities import (
     RecordStatus,
     ValidationResult,
 )
+from app.rag.retrieval import retrieve_rules
 
 
 @dataclass(frozen=True)
@@ -160,11 +161,26 @@ def run_quality_assurance(db: Session, *, job_id: UUID, workspace_id: UUID, user
     records = db.scalars(select(HarmonizedLandRecord).where(HarmonizedLandRecord.job_id == job_id).order_by(HarmonizedLandRecord.id)).all()
     if not records:
         raise ValueError("This job has no harmonized records to validate")
+    rule_context = retrieve_rules(
+        db,
+        workspace_id=workspace_id,
+        query="Land-record validation policy for plot identifiers, ownership, positive area, geometry CRS, and parcel overlaps",
+        limit=5,
+    )
+    rule_references = [
+        {
+            "rule_key": rule["document_rule_key"],
+            "title": rule["title"],
+            "source_reference": rule["source_reference"],
+            "similarity": rule["similarity"],
+        }
+        for rule in rule_context
+    ]
 
     started = datetime.now(UTC)
     execution = AgentExecution(
         job_id=job_id, agent_name="quality_assurance", status="running", attempt=1,
-        input_summary={"record_count": len(records), "checks": ["pandera_schema", "land_rules", "postgis_geometry", "parcel_overlap"]},
+        input_summary={"record_count": len(records), "checks": ["pandera_schema", "land_rules", "postgis_geometry", "parcel_overlap"], "retrieved_rules": rule_references},
         started_at=started,
     )
     db.add(execution)
@@ -252,6 +268,7 @@ def run_quality_assurance(db: Session, *, job_id: UUID, workspace_id: UUID, user
         "warnings": issue_counts[FindingSeverity.WARNING.value],
         "informational_issues": issue_counts[FindingSeverity.INFO.value],
         "overlapping_pairs": overlap_count, "quality_score": average_score,
+        "retrieved_rules": rule_references,
     }
     finished = datetime.now(UTC)
     execution.status = "completed"

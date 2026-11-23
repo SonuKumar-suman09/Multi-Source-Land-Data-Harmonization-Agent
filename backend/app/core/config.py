@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     database_url: str = "postgresql+psycopg://land_app:change_me_local_only@127.0.0.1:5433/land_harmonizer"
     embedding_dimensions: int = Field(default=768, ge=1)
+    rag_embedding_provider: str = "local"
+    gemini_api_key: SecretStr | None = None
+    gemini_embedding_model: str = "gemini-embedding-001"
     jwt_secret_key: str = "replace_with_a_random_secret_before_running_auth"
     jwt_access_token_minutes: int = Field(default=30, ge=1, le=1440)
     frontend_origins: str = "http://localhost:5173"

@@ -90,12 +90,21 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
         assert summary["duplicate_pairs"] >= 2
         assert summary["validation_findings"] > 0
 
+        policy_content = b"Policy: plot identifiers are required. Area must be positive, geometry must be valid, and ownership cannot be inferred."
+        knowledge_upload = client.post(
+            "/api/v1/knowledge/documents", headers=headers,
+            data={"title": "Synthetic QA policy", "rule_key": f"qa-policy-{uuid4().hex[:8]}", "version": "1"},
+            files={"file": ("qa_policy.md", policy_content, "text/markdown")},
+        )
+        assert knowledge_upload.status_code == 201, knowledge_upload.text
+
         quality = client.post(f"/api/v1/quality/jobs/{job_id}/run", headers=headers)
         assert quality.status_code == 200, quality.text
         quality_report = quality.json()
         assert quality_report["records_checked"] == 11
         assert quality_report["critical_errors"] > 0
         assert quality_report["warnings"] > 0
+        assert quality_report["retrieved_rules"]
         assert 0 <= quality_report["quality_score"] <= 100
         repeated_quality = client.post(f"/api/v1/quality/jobs/{job_id}/run", headers=headers)
         assert repeated_quality.status_code == 200
@@ -151,3 +160,4 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
             from app.services.ingestion import _storage_root
             import shutil
             shutil.rmtree(_storage_root() / str(workspace_id), ignore_errors=True)
+            shutil.rmtree(_storage_root().parent / "knowledge" / str(workspace_id), ignore_errors=True)

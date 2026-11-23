@@ -18,6 +18,8 @@ data/uploads/**
 !data/uploads/.gitkeep
 data/processed/**
 !data/processed/.gitkeep
+data/knowledge/**
+!data/knowledge/.gitkeep
 *.gpkg-shm
 *.gpkg-wal
 
