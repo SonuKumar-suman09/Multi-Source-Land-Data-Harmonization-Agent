@@ -1,0 +1,21 @@
+# Python 3.11+. Versions will be pinned and compatibility-checked in Phase 2.
+# Runtime dependencies through Phase 5; later phases add their own pinned packages.
+alembic==1.20.1
+email-validator==2.3.0
+fastapi==0.165.0
+geopandas==1.2.0
+GeoAlchemy2==0.20.0
+numpy==2.5.5
+openpyxl==3.1.5
+pandas==3.1.1
+pgvector==0.5.1
+pyogrio==0.13.0
+pyproj==3.8.0
+PyJWT==2.15.1
+pydantic-settings==2.16.3
+psycopg[binary]==3.3.9
+python-multipart==0.0.34
+pwdlib[argon2]==0.4.2
+shapely==2.2.0
+SQLAlchemy==2.0.58
+uvicorn[standard]==0.54.0
