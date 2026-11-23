@@ -96,6 +96,15 @@ python -m celery -A app.tasks.celery_app:celery_app worker --loglevel=info --poo
 
 `--pool=solo` is a simple local development worker mode. Keep that terminal open. In Swagger, call `POST /api/v1/workflows/jobs/{job_id}/enqueue`; it returns HTTP `202` and a task ID after recording the queued state and publishing the task. `GET /api/v1/workflows/jobs/{job_id}` reports progress and the final result. Repeated enqueue requests while the task is queued or running return the existing task ID instead of creating duplicate work. The synchronous `/run` endpoint remains useful for debugging. Run `docker compose up -d db redis` to start the database and broker, and check `GET /health/ready` for both service connections. The LangGraph graph does not call Gemini yet, so no paid LLM key is needed for this workflow.
 
+The regular suite checks task configuration without requiring a worker. For a real queue-to-worker integration check, start the worker as above, then in another terminal run:
+
+```powershell
+$env:RUN_CELERY_E2E = "1"
+python -m pytest backend/tests/test_celery_workflow_e2e.py -q
+```
+
+The optional check creates a synthetic account and upload, enqueues the job, waits for completion, verifies the persisted agent execution, and removes its test data. It is skipped in the standard suite unless `RUN_CELERY_E2E=1` is set.
+
 ### Index and retrieve land-data rules
 
 The knowledge API accepts UTF-8 `.md`, `.txt`, and `.json` documents up to 1 MB. It stores the original file under the ignored `data/knowledge/` directory, hashes it, splits it into overlapping text chunks, and stores 768-dimensional embeddings with the source reference in PostgreSQL/pgvector. Document listing and search are scoped to the authenticated user's workspace. QA retrieves relevant indexed policy chunks and includes their titles and source references in the report; the rule text is surfaced for review while record corrections remain deterministic and auditable.
