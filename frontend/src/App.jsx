@@ -90,7 +90,7 @@ function AuthPage({ onAuthenticated, initialError }) {
   return (
     <main className="auth-page">
       <div className="auth-aside">
-        <div className="brand brand-light"><span className="brand-symbol"><LandPlot size={19} /></span> TERRAFORM <span className="brand-tag">LAND DATA</span></div>
+        <div className="brand brand-light"><span className="brand-symbol"><LandPlot size={19} /></span> LANDSYNC <span className="brand-tag">LAND DATA</span></div>
         <div className="auth-story">
           <div className="eyebrow eyebrow-light"><span className="eyebrow-dot" /> LAND RECORDS · ONE WORKSPACE</div>
           <h1>Bring every parcel record into focus.</h1>
@@ -136,7 +136,7 @@ function ProtectedLayout({ user, onLogout }) {
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
-        <NavLink to="/" className="brand"><span className="brand-symbol"><LandPlot size={19} /></span><span>TERRAFORM</span></NavLink>
+        <NavLink to="/" className="brand"><span className="brand-symbol"><LandPlot size={19} /></span><span>LANDSYNC</span></NavLink>
         <div className="workspace-switcher"><span className="workspace-mark">{(user.display_name || user.email)?.slice(0, 1).toUpperCase()}</span><span className="workspace-label"><small>WORKSPACE</small><b>My land records</b></span></div>
         <div className="nav-label">WORKSPACE</div>
         <nav className="side-nav">
