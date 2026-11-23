@@ -158,7 +158,7 @@ The **Reports & audit** page is available from the dashboard navigation. Select 
 
 ### Index and retrieve land-data rules
 
-The knowledge API accepts UTF-8 `.md`, `.txt`, and `.json` documents up to 1 MB. It stores the original file under the ignored `data/knowledge/` directory, hashes it, splits it into overlapping text chunks, and stores 768-dimensional embeddings with the source reference in PostgreSQL/pgvector. Document listing and search are scoped to the authenticated user's workspace. QA retrieves relevant indexed policy chunks and includes their titles and source references in the report; the rule text is surfaced for review while record corrections remain deterministic and auditable.
+The **Knowledge base** page accepts UTF-8 `.md`, `.txt`, and `.json` documents up to 1 MB, lists indexed sources, and searches retrieved rule chunks. The API stores each original under the ignored `data/knowledge/` directory, hashes it, splits it into overlapping text chunks, and stores 768-dimensional embeddings with source references in PostgreSQL/pgvector. Listing, upload, and search are scoped to the authenticated user's workspace. QA retrieves relevant indexed policy chunks and includes their titles and source references in its report; rule text is surfaced for review while record corrections remain deterministic and auditable.
 
 The default `RAG_EMBEDDING_PROVIDER=local` mode works offline without a paid API key using deterministic lexical feature hashing. To use Gemini, add these values to your untracked `.env` file and restart the API:
 

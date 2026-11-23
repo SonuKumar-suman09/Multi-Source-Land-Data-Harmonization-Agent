@@ -20,6 +20,7 @@
 5. On **Overview**, point out real persisted dataset/record counts and review status; the application does not fill the charts with invented demo metrics.
 6. On **Parcel map**, filter valid or invalid features, select a record, and inspect stored attributes. Invalid or missing geometry is not drawn as a valid parcel.
 7. On **Reports & audit**, show the source file hashes/metadata, findings, recorded workflow events, and download both CSV and PDF. The CSV carries original source data and transformation history for traceability.
+8. On **Knowledge base**, index a small synthetic Markdown rule, search for a matching phrase, and show the retrieved chunk and its source reference. QA can retrieve indexed guidance during a subsequent run.
 
 With the checked-in fixtures, the uploaded batch contains 11 source rows across 3 files. The last verified run displayed 2 valid records, 2 invalid, 2 needing review, 5 conflict records, 5 duplicate pairs, and a 69.9 quality score. These are results from that specific synthetic fixture run, not performance measurements or government data.
 
@@ -71,7 +72,7 @@ The React dashboard lets an analyst upload a batch, review actual quality counts
 
 - Gemini is optional and currently used for embeddings only; the workflow does not call a Gemini chat model to choose ambiguous mappings.
 - Ambiguous mappings become review findings, but a dedicated mapping approval screen/action is not implemented yet.
-- Knowledge documents can be indexed and searched through the authenticated API/OpenAPI page; a dedicated knowledge-base React page is not included yet.
+- Knowledge documents can be indexed and searched through the authenticated API or the dashboard Knowledge base page.
 - MinIO, Langfuse, and OpenTelemetry are architecture options, not connected services in the current local stack.
 - The project is a strong local demonstration, not a land-title authority or production deployment for legal decisions.
 
