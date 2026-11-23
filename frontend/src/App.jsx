@@ -12,6 +12,8 @@ const DashboardCharts = lazy(() => import("./components/DashboardCharts.jsx"));
 const MapPage = lazy(() => import("./pages/MapPage.jsx"));
 const ReportsPage = lazy(() => import("./pages/ReportsPage.jsx"));
 const KnowledgePage = lazy(() => import("./pages/KnowledgePage.jsx"));
+const AgentsPage = lazy(() => import("./pages/AgentsPage.jsx"));
+const QualityPage = lazy(() => import("./pages/QualityPage.jsx"));
 
 const sections = [
   { to: "/", label: "Overview", icon: LandPlot, end: true },
@@ -19,6 +21,8 @@ const sections = [
   { to: "/map", label: "Parcel map", icon: MapIcon },
   { to: "/reports", label: "Reports & audit", icon: FileText },
   { to: "/knowledge", label: "Knowledge base", icon: BookOpen },
+  { to: "/agents", label: "Agent activity", icon: Sparkles },
+  { to: "/quality", label: "Data quality", icon: ShieldCheck },
 ];
 
 export default function App() {
@@ -48,6 +52,8 @@ export default function App() {
         <Route path="map" element={<Suspense fallback={<LoadingScreen label="Loading parcel map" compact />}><MapPage /></Suspense>} />
         <Route path="reports" element={<Suspense fallback={<LoadingScreen label="Loading reports" compact />}><ReportsPage /></Suspense>} />
         <Route path="knowledge" element={<Suspense fallback={<LoadingScreen label="Loading knowledge base" compact />}><KnowledgePage /></Suspense>} />
+        <Route path="agents" element={<Suspense fallback={<LoadingScreen label="Loading agent activity" compact />}><AgentsPage /></Suspense>} />
+        <Route path="quality" element={<Suspense fallback={<LoadingScreen label="Loading quality review" compact />}><QualityPage /></Suspense>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
