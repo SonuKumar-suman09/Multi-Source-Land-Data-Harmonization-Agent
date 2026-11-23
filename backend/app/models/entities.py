@@ -78,6 +78,18 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class RevokedToken(Base):
+    """Revoked JWT identifiers retained only until their signed expiry."""
+
+    __tablename__ = "revoked_tokens"
+    __table_args__ = (Index("ix_revoked_tokens_expires_at", "expires_at"),)
+
+    token_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class Workspace(Base):
     __tablename__ = "workspaces"
     __table_args__ = (UniqueConstraint("slug", name="uq_workspaces_slug"),)

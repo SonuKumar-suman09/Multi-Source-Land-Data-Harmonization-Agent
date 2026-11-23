@@ -47,7 +47,11 @@ export default function App() {
   }
   return (
     <Routes>
-      <Route element={<ProtectedLayout user={auth.user} onLogout={() => { clearSession(); setAuth({ user: null, loading: false }); }} />}>
+      <Route element={<ProtectedLayout user={auth.user} onLogout={async () => {
+        try { await apiRequest("/api/v1/auth/logout", { method: "POST" }); }
+        catch { /* Clear the local credential even if the API is unavailable. */ }
+        finally { clearSession(); setAuth({ user: null, loading: false }); }
+      }} />}>
         <Route index element={<DashboardPage user={auth.user} />} />
         <Route path="upload" element={<UploadPage />} />
         <Route path="map" element={<Suspense fallback={<LoadingScreen label="Loading parcel map" compact />}><MapPage /></Suspense>} />

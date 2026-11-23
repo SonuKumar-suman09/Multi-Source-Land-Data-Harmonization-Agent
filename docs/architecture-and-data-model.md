@@ -46,13 +46,14 @@ flowchart TD
   QA -. retryable DB failure .-> Celery
 ```
 
-The upload endpoint parses files and stores raw rows before enqueuing. The graph's ingestion node verifies those persisted rows; it does not parse the files a second time. The harmonization and QA steps are deterministic. QA retrieves applicable knowledge-base chunks when available. Gemini can create embeddings for that knowledge base when configured; the current graph does **not** call a Gemini chat model to resolve ambiguous schema mappings. Ambiguous mappings remain review findings.
+The upload endpoint parses files and stores raw rows before enqueuing. The graph's ingestion node verifies those persisted rows; it does not parse the files a second time. The harmonization and QA steps are deterministic. QA retrieves applicable knowledge-base chunks when available. Gemini can create embeddings for the knowledge base when configured. Optional Gemini schema suggestions are also implemented: only column headers are sent after the user explicitly consents, and a person must review and save mapping decisions before processing.
 
 ## Database ER diagram
 
 ```mermaid
 erDiagram
   USERS ||--o{ WORKSPACE_MEMBERSHIPS : joins
+  USERS ||--o{ REVOKED_TOKENS : signs_out
   WORKSPACES ||--o{ WORKSPACE_MEMBERSHIPS : contains
   WORKSPACES ||--o{ DATA_SOURCES : owns
   WORKSPACES ||--o{ PROCESSING_JOBS : owns
@@ -88,6 +89,12 @@ erDiagram
     string email UK
     string password_hash
     string role
+  }
+  REVOKED_TOKENS {
+    uuid token_id PK
+    uuid user_id FK
+    datetime expires_at
+    datetime revoked_at
   }
   WORKSPACES {
     uuid id PK
@@ -202,6 +209,7 @@ Interactive OpenAPI documentation is available at `http://localhost:8001/docs` w
 | --- | --- | --- |
 | `POST` | `/api/v1/auth/register` | Create an analyst account and personal workspace. |
 | `POST` | `/api/v1/auth/login` | Verify credentials and issue a short-lived JWT. |
+| `POST` | `/api/v1/auth/logout` | Revoke the current JWT immediately and record a workspace audit event. |
 | `GET` | `/api/v1/auth/me` | Read the signed-in user's profile. |
 | `PATCH` | `/api/v1/auth/me` | Update the profile display name and write a workspace audit event. |
 | `GET` | `/api/v1/dashboard/summary` | Get workspace counts and recent processing jobs. |

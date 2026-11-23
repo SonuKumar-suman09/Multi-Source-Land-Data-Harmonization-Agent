@@ -1,7 +1,7 @@
 """Password hashing and signed access-token helpers."""
 
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import jwt
 from pwdlib import PasswordHash
@@ -30,15 +30,18 @@ def create_access_token(user_id: UUID) -> tuple[str, int]:
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
+        "jti": str(uuid4()),
         "iat": now,
         "exp": now + timedelta(seconds=lifetime_seconds),
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=JWT_ALGORITHM), lifetime_seconds
 
 
-def decode_access_token(token: str) -> UUID:
+def decode_access_token(token: str) -> tuple[UUID, UUID, datetime]:
     payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[JWT_ALGORITHM])
     subject = payload.get("sub")
-    if not isinstance(subject, str):
-        raise jwt.InvalidTokenError("Token subject is missing")
-    return UUID(subject)
+    token_id = payload.get("jti")
+    expires_at = payload.get("exp")
+    if not isinstance(subject, str) or not isinstance(token_id, str) or not isinstance(expires_at, (int, float)):
+        raise jwt.InvalidTokenError("Token claims are incomplete")
+    return UUID(subject), UUID(token_id), datetime.fromtimestamp(expires_at, UTC)

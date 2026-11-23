@@ -3,15 +3,18 @@
 import logging
 import re
 import uuid
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.security import HTTPAuthorizationCredentials
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
-from app.core.security import create_access_token, hash_password, verify_password
-from app.models.entities import AuditLog, User, UserRole, Workspace, WorkspaceMembership
+from app.api.deps import bearer_scheme, get_current_user, get_db
+from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
+from app.models.entities import AuditLog, RevokedToken, User, UserRole, Workspace, WorkspaceMembership
 from app.schemas.auth import LoginRequest, ProfileUpdateRequest, RegisterRequest, TokenResponse, UserResponse
 
 logger = logging.getLogger(__name__)
@@ -90,6 +93,39 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is inactive")
     return _issue_token(user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Revoke this access token immediately; the client should also discard it."""
+    if credentials is None:  # get_current_user already rejects this, kept for type narrowing.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    try:
+        user_id, token_id, expires_at = decode_access_token(credentials.credentials)
+    except (jwt.InvalidTokenError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required") from None
+    if user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
+    now = datetime.now(UTC)
+    db.execute(delete(RevokedToken).where(RevokedToken.expires_at <= now))
+    db.add(RevokedToken(token_id=token_id, user_id=user.id, expires_at=expires_at))
+    memberships = db.scalars(select(WorkspaceMembership).where(WorkspaceMembership.user_id == user.id)).all()
+    for membership in memberships:
+        db.add(AuditLog(
+            workspace_id=membership.workspace_id,
+            actor_id=user.id,
+            action="user.signed_out",
+            object_type="session",
+            object_id=token_id,
+            details={},
+        ))
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/me", response_model=UserResponse)

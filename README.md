@@ -10,7 +10,7 @@ Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture
 
 Phase 13 adds workspace-scoped JSON, CSV, and PDF reports for each processing job, including source-file provenance, agent execution history, audit events, validation findings, record counts, duplicate counts, and quality score. The React **Reports & audit** page selects a recent job and downloads its CSV or PDF. Phase 14 adds integration and security tests for report downloads, spreadsheet formula escaping, and workspace isolation. Phase 15 packages the database, API, Celery worker, and React dashboard as a Docker Compose application with health checks, ordered migrations, persistent local data volumes, and a same-origin Nginx API proxy. Phase 16 adds architecture and ER diagrams, an API reference, a demo walkthrough, interview Q&A, and a resume-ready project description.
 
-The dashboard also provides a Knowledge base page, Agent activity view, and Data quality review page. Uploaded columns can be mapped deterministically or reviewed manually before a workflow starts. Gemini mapping suggestions are optional and require explicit consent; only header names are sent, never record cell values. Original uploads support local disk by default and an optional MinIO endpoint. OpenTelemetry traces and Langfuse callbacks are optional and disabled until configured. Current limits are listed in [`docs/demo-and-interview-guide.md`](docs/demo-and-interview-guide.md).
+The dashboard also provides a Knowledge base page, Agent activity view, and Data quality review page. Uploaded columns can be mapped deterministically or reviewed manually before a workflow starts. Gemini mapping suggestions are optional and require explicit consent; only header names are sent, never record cell values. Sign-out revokes the current access token server-side. Original uploads support local disk by default and an optional MinIO endpoint. OpenTelemetry traces and Langfuse callbacks are optional and disabled until configured. Current operational limits are listed in [`docs/demo-and-interview-guide.md`](docs/demo-and-interview-guide.md).
 
 Project presentation materials:
 
@@ -169,6 +169,10 @@ MINIO_SECURE=false
 ```
 
 Use the service DNS name when MinIO shares the Compose network, or a host/network-reachable endpoint such as `host.docker.internal:9000` for a separate local MinIO server. Set `MINIO_SECURE=true` when connecting over TLS. Restart the API and worker after editing `.env` with `docker compose up -d --build api worker`. The first upload creates the configured bucket, so the MinIO credentials need permission to check/create that bucket and put/delete objects. Each database row stores the object key and storage-backend metadata; source bytes are never rewritten. Do not commit `.env` or real credentials. To return to local disk, set `STORAGE_BACKEND=local` and restart the API and worker.
+
+### Local backup and restore
+
+From PowerShell at the repository root, run `./scripts/backup.ps1` to create a timestamped backup under the ignored `backups/` folder. It includes a PostgreSQL custom-format dump plus local uploads, knowledge files, and processed files. Restore with `./scripts/restore.ps1 -BackupPath .\backups\landsync-<timestamp>`; the script prints a warning and requires typing `RESTORE` because the current database and those local data folders are replaced. Verify the restored app at `http://localhost:8080` and `http://127.0.0.1:8001/health/ready`. MinIO object bytes are outside this local backup; snapshot and restore the bucket separately before using `-MinioBucketRestored`.
 
 ### Optional tracing with OpenTelemetry and Langfuse
 

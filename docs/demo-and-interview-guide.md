@@ -55,7 +55,7 @@ It is a deterministic review-priority score based on recorded checks. It is not 
 The API derives allowed workspaces from the authenticated user's membership and returns 404 for jobs outside those workspaces. Integration tests cover JSON/CSV/PDF report isolation and CSV formula-prefix escaping.
 
 **10. What would you improve before production?**  
-Add stronger account administration/refresh-token lifecycle, backup/restore drills, and operational MinIO provisioning/credential rotation. Configure OTLP and Langfuse credentials only for a deployment that has approved telemetry destinations.
+The API now revokes signed-out access tokens immediately, and the repository includes local database/file backup and guarded restore scripts. Before a shared deployment, run and document restore drills, add managed secret rotation and account-administration controls, and provision MinIO with least-privilege credentials and a bucket recovery plan. Enable telemetry only after selecting an approved OTLP/Langfuse destination.
 
 ## Resume-ready description
 
@@ -67,7 +67,7 @@ Add stronger account administration/refresh-token lifecycle, backup/restore dril
 
 The processing workflow uses LangGraph for persisted stages and checkpoints, while Celery and Redis run longer jobs outside the API request. PostgreSQL stores the records and audit history, PostGIS stores spatial geometry, and pgvector supports workspace-scoped retrieval of validation guidance. Quality checks flag missing identifiers, invalid areas or geometry, duplicate plots, and conflicting ownership or area values. The system keeps conflicting source rows and asks for review instead of silently choosing a value.
 
-The React dashboard lets an analyst upload a batch, review actual quality counts, filter parcels on a Leaflet map, and download a provenance-rich CSV or PDF report. The checked-in demo uses three synthetic files with 11 rows, including intentionally problematic records. I also tested the API, workspace report isolation, CSV export safety, and a real Celery worker run. The current implementation uses deterministic mapping; Gemini embeddings can be enabled for RAG, while LLM-generated mapping proposals and a mapping-approval UI are planned extensions.”
+The React dashboard lets an analyst upload a batch, review and approve column mappings, inspect actual quality counts, filter parcels on a Leaflet map, and download a provenance-rich CSV or PDF report. The checked-in demo uses three synthetic files with 11 rows, including intentionally problematic records. I also tested the API, workspace report isolation, CSV export safety, and a real Celery worker run. The mapping suggestions are deterministic by default; a person can optionally ask Gemini for header-only suggestions after giving consent. Gemini embeddings and trace export are separately optional.”
 
 ## Scope to state clearly in a presentation
 
@@ -75,5 +75,7 @@ The React dashboard lets an analyst upload a batch, review actual quality counts
 - Original uploads can use local storage (default) or a configured MinIO endpoint; deployment and credential rotation still need operational setup.
 - Knowledge documents can be indexed and searched through the authenticated API or the dashboard Knowledge base page.
 - OpenTelemetry and Langfuse callbacks are implemented but optional; without endpoints and keys, they remain off. Langfuse only sees Gemini schema suggestion calls made after header-sharing consent.
+- Sign-out revokes the current JWT at the API and clears the browser session. Local backup and guarded restore scripts cover PostgreSQL plus uploads, knowledge, and processed files. A configured MinIO bucket must be backed up separately.
+- Create a local backup with `./scripts/backup.ps1`. Restoring replaces the current local database and file folders, requires typing `RESTORE`, and must only be done with the intended backup. For MinIO, restore the matching bucket first and pass `-MinioBucketRestored`.
 - The project is a strong local demonstration, not a land-title authority or production deployment for legal decisions.
 

@@ -5,11 +5,12 @@ from collections.abc import Generator
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.database.session import SessionLocal
-from app.models.entities import User
+from app.models.entities import RevokedToken, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -34,9 +35,13 @@ def get_current_user(
     if credentials is None:
         raise unauthorized
     try:
-        user_id = decode_access_token(credentials.credentials)
+        user_id, token_id, _ = decode_access_token(credentials.credentials)
     except (jwt.InvalidTokenError, ValueError):
         raise unauthorized from None
+
+    revoked = db.scalar(select(RevokedToken.token_id).where(RevokedToken.token_id == token_id))
+    if revoked is not None:
+        raise unauthorized
 
     user = db.get(User, user_id)
     if user is None or not user.is_active:

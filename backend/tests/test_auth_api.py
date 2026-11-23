@@ -101,6 +101,16 @@ def test_auth_register_login_and_protected_profile() -> None:
         )
         assert parcel_map.status_code == 200, parcel_map.text
         assert parcel_map.json() == {"type": "FeatureCollection", "features": [], "count": 0}
+
+        signed_out = client.post(
+            "/api/v1/auth/logout",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert signed_out.status_code == 204
+        assert client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        ).status_code == 401
     finally:
         if user_id is not None:
             with SessionLocal.begin() as db:
