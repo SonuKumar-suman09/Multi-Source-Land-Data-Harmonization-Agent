@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import math
 import re
 import shutil
@@ -36,6 +37,9 @@ from app.models.entities import (
     RawLandRecord,
     UploadedFile,
 )
+from app.services.object_storage import delete_original, local_storage_root, store_original
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".csv", ".xlsx", ".xlsm", ".json", ".geojson", ".zip"}
 MAX_ROWS_PER_FILE = 250_000
@@ -338,22 +342,7 @@ def parse_dataset(filename: str, content: bytes) -> ParsedDataset:
 
 
 def _storage_root() -> Path:
-    project_root = Path(__file__).resolve().parents[3]
-    configured = Path(settings.upload_dir)
-    return configured if configured.is_absolute() else project_root / configured
-
-
-def _store_original(root: Path, object_key: str, content: bytes) -> Path:
-    destination = root.joinpath(*PurePosixPath(object_key).parts)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_suffix(destination.suffix + ".part")
-    try:
-        temporary.write_bytes(content)
-        temporary.replace(destination)
-    except Exception:
-        temporary.unlink(missing_ok=True)
-        raise
-    return destination
+    return local_storage_root()
 
 
 def ingest_files(
@@ -403,8 +392,7 @@ def ingest_files(
             raise DuplicateUpload(f"'{filename}' has already been uploaded to this workspace")
         parsed_files.append((upload, parsed, file_format, sha256))
 
-    root = _storage_root()
-    written_paths: list[Path] = []
+    written_keys: list[str] = []
     try:
         source = db.scalar(
             select(DataSource).where(
@@ -442,14 +430,15 @@ def ingest_files(
             original_filename = _safe_filename(upload.filename)
             file_id = uuid.uuid4()
             object_key = f"{workspace_id}/{file_id}{Path(original_filename).suffix.lower()}"
-            stored_path = _store_original(root, object_key, upload.content)
-            written_paths.append(stored_path)
+            store_original(object_key, upload.content, upload.media_type)
+            written_keys.append(object_key)
 
             metadata = {
                 **parsed.metadata,
                 "row_count": len(parsed.rows),
                 "columns": parsed.columns,
                 "source_crs_override": default_crs,
+                "storage_backend": settings.storage_backend,
             }
             uploaded = UploadedFile(
                 id=file_id,
@@ -532,6 +521,9 @@ def ingest_files(
         )
     except Exception:
         db.rollback()
-        for path in written_paths:
-            path.unlink(missing_ok=True)
+        for object_key in written_keys:
+            try:
+                delete_original(object_key)
+            except Exception:
+                logger.exception("Could not clean up failed upload object %s", object_key)
         raise

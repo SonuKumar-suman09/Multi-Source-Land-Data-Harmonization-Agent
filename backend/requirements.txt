@@ -10,6 +10,7 @@ langchain==1.5.2
 langchain-google-genai==4.5.2
 langgraph==1.2.24
 langgraph-checkpoint-postgres==3.2.1
+minio==7.2.20
 numpy==2.5.5
 openpyxl==3.1.5
 pandera==0.36.0

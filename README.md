@@ -10,7 +10,7 @@ Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture
 
 Phase 13 adds workspace-scoped JSON, CSV, and PDF reports for each processing job, including source-file provenance, agent execution history, audit events, validation findings, record counts, duplicate counts, and quality score. The React **Reports & audit** page selects a recent job and downloads its CSV or PDF. Phase 14 adds integration and security tests for report downloads, spreadsheet formula escaping, and workspace isolation. Phase 15 packages the database, API, Celery worker, and React dashboard as a Docker Compose application with health checks, ordered migrations, persistent local data volumes, and a same-origin Nginx API proxy. Phase 16 adds architecture and ER diagrams, an API reference, a demo walkthrough, interview Q&A, and a resume-ready project description.
 
-The dashboard also provides a Knowledge base page, Agent activity view, and Data quality review page. Uploaded columns can be mapped deterministically or reviewed manually before a workflow starts. Gemini mapping suggestions are optional and require explicit consent; only header names are sent, never record cell values. MinIO, Langfuse, and OpenTelemetry are not integrated yet. Current limits are listed in [`docs/demo-and-interview-guide.md`](docs/demo-and-interview-guide.md); do not describe those optional integrations as completed features in a presentation.
+The dashboard also provides a Knowledge base page, Agent activity view, and Data quality review page. Uploaded columns can be mapped deterministically or reviewed manually before a workflow starts. Gemini mapping suggestions are optional and require explicit consent; only header names are sent, never record cell values. Original uploads support local disk by default and an optional MinIO endpoint; Langfuse and OpenTelemetry are not integrated yet. Current limits are listed in [`docs/demo-and-interview-guide.md`](docs/demo-and-interview-guide.md); do not describe those optional integrations as completed features in a presentation.
 
 Project presentation materials:
 
@@ -154,6 +154,21 @@ npm run dev
 ```
 
 Open the Vite URL shown in the terminal (normally `http://localhost:5173`). Register an account or sign in, then upload a synthetic source batch. Review the proposed mappings and approve them before starting the Celery workflow. The overview reads actual workspace-scoped counts from `/api/v1/dashboard/summary`; it does not fill empty states with sample metrics. `VITE_API_URL` can override the API base URL when it is not `http://127.0.0.1:8000`.
+
+### Optional MinIO storage for original uploads
+
+Local disk remains the default. To use a MinIO deployment reachable from the API and worker containers, set these values in the ignored `.env` file:
+
+```dotenv
+STORAGE_BACKEND=minio
+MINIO_ENDPOINT=minio:9000
+MINIO_ACCESS_KEY=your_minio_access_key
+MINIO_SECRET_KEY=your_minio_secret_key
+MINIO_BUCKET=land-source-files
+MINIO_SECURE=false
+```
+
+Use the service DNS name when MinIO shares the Compose network, or a host/network-reachable endpoint such as `host.docker.internal:9000` for a separate local MinIO server. Set `MINIO_SECURE=true` when connecting over TLS. Restart the API and worker after editing `.env` with `docker compose up -d --build api worker`. The first upload creates the configured bucket, so the MinIO credentials need permission to check/create that bucket and put/delete objects. Each database row stores the object key and storage-backend metadata; source bytes are never rewritten. Do not commit `.env` or real credentials. To return to local disk, set `STORAGE_BACKEND=local` and restart the API and worker.
 
 The **Parcel map** view requests valid stored geometries from `/api/v1/map/parcels` as GeoJSON, then draws them with Leaflet. Search by plot or landholder, filter by harmonized record status, select a parcel to inspect its stored attributes, and zoom to it from the parcel list. The API can also accept a complete WGS84 bounding box with `min_lon`, `min_lat`, `max_lon`, and `max_lat`; partial or inverted bounds are rejected. OpenStreetMap tiles include the required attribution; review the [Leaflet map and tile guidance](https://leafletjs.com/examples/quick-start/) before changing tile providers or using this demo in production.
 

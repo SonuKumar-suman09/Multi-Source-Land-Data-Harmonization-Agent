@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,6 +24,12 @@ class Settings(BaseSettings):
     jwt_access_token_minutes: int = Field(default=30, ge=1, le=1440)
     frontend_origins: str = "http://localhost:5173"
     upload_dir: str = "./data/uploads"
+    storage_backend: Literal["local", "minio"] = "local"
+    minio_endpoint: str = "localhost:9000"
+    minio_access_key: SecretStr | None = None
+    minio_secret_key: SecretStr | None = None
+    minio_bucket: str = "land-source-files"
+    minio_secure: bool = False
     max_upload_mb: int = Field(default=100, ge=1, le=1024)
 
     model_config = SettingsConfigDict(
