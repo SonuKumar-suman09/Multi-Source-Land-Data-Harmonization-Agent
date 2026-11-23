@@ -21,6 +21,7 @@
 6. On **Parcel map**, filter valid or invalid features, select a record, and inspect stored attributes. Invalid or missing geometry is not drawn as a valid parcel.
 7. On **Reports & audit**, show the source file hashes/metadata, findings, recorded workflow events, and download both CSV and PDF. The CSV carries original source data and transformation history for traceability.
 8. On **Knowledge base**, index a small synthetic Markdown rule, search for a matching phrase, and show the retrieved chunk and its source reference. QA can retrieve indexed guidance during a subsequent run.
+9. Open **Agent activity** to inspect stored agent execution status and timing, then use **Data quality** to filter the job's persisted findings by severity.
 
 With the checked-in fixtures, the uploaded batch contains 11 source rows across 3 files. The last verified run displayed 2 valid records, 2 invalid, 2 needing review, 5 conflict records, 5 duplicate pairs, and a 69.9 quality score. These are results from that specific synthetic fixture run, not performance measurements or government data.
 
@@ -58,7 +59,7 @@ Add a human schema-mapping approval workflow, stronger account administration/re
 
 ## Resume-ready description
 
-**Multi-Source Land-Data Harmonization Agent** — Built a workspace-scoped land-data integration platform with FastAPI, PostgreSQL/PostGIS, pgvector, LangGraph, Celery/Redis, and React. Implemented multi-format ingestion with immutable source files and row-level lineage, deterministic schema/area/date/CRS normalization, duplicate/conflict detection, rule retrieval, quality checks, interactive GeoJSON mapping, audit history, and CSV/PDF reports. Packaged the application with Docker Compose and verified the workflow with integration and worker end-to-end tests. All demonstration land records are synthetic.
+**Multi-Source Land-Data Harmonization Agent** — Built a workspace-scoped land-data integration platform with FastAPI, PostgreSQL/PostGIS, pgvector, LangGraph, Celery/Redis, and React. Implemented multi-format ingestion with immutable source files and row-level lineage, deterministic schema/area/date/CRS normalization, duplicate/conflict detection, rule retrieval, quality checks, interactive GeoJSON mapping, execution monitoring, audit history, and CSV/PDF reports. Packaged the application with Docker Compose and verified the workflow with integration and worker end-to-end tests. All demonstration land records are synthetic.
 
 ## Two-minute project explanation
 

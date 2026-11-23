@@ -8,7 +8,7 @@ Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture
 
 Phase 13 adds workspace-scoped JSON, CSV, and PDF reports for each processing job, including source-file provenance, agent execution history, audit events, validation findings, record counts, duplicate counts, and quality score. The React **Reports & audit** page selects a recent job and downloads its CSV or PDF. Phase 14 adds integration and security tests for report downloads, spreadsheet formula escaping, and workspace isolation. Phase 15 packages the database, API, Celery worker, and React dashboard as a Docker Compose application with health checks, ordered migrations, persistent local data volumes, and a same-origin Nginx API proxy. Phase 16 adds architecture and ER diagrams, an API reference, a demo walkthrough, interview Q&A, and a resume-ready project description.
 
-The design roadmap includes optional capabilities that are not implemented yet. The current limits are listed in [`docs/demo-and-interview-guide.md`](docs/demo-and-interview-guide.md); in particular, ambiguous mapping approval, Gemini chat-based mapping proposals, a React knowledge-base page, MinIO, Langfuse, and OpenTelemetry are future work. Do not describe these as completed features in a presentation.
+The dashboard also provides a Knowledge base page, Agent activity view, and Data quality review page. The design roadmap still includes capabilities that are not implemented yet. Current limits are listed in [`docs/demo-and-interview-guide.md`](docs/demo-and-interview-guide.md); in particular, Gemini chat-based mapping proposals and approval, MinIO, Langfuse, and OpenTelemetry are future work. Do not describe these as completed features in a presentation.
 
 Project presentation materials:
 
@@ -155,6 +155,8 @@ Open the Vite URL shown in the terminal (normally `http://localhost:5173`). Regi
 The **Parcel map** view requests valid stored geometries from `/api/v1/map/parcels` as GeoJSON, then draws them with Leaflet. Search by plot or landholder, filter by harmonized record status, select a parcel to inspect its stored attributes, and zoom to it from the parcel list. The API can also accept a complete WGS84 bounding box with `min_lon`, `min_lat`, `max_lon`, and `max_lat`; partial or inverted bounds are rejected. OpenStreetMap tiles include the required attribution; review the [Leaflet map and tile guidance](https://leafletjs.com/examples/quick-start/) before changing tile providers or using this demo in production.
 
 The **Reports & audit** page is available from the dashboard navigation. Select a recent processing job to review source files, record-quality totals, validation findings, recorded agent executions, and the job's audit timeline. Download CSV for row-level data and lineage or PDF for a compact processing summary. Both downloads require sign-in and the job must belong to a workspace where the signed-in user is a member. CSV text fields are escaped to reduce spreadsheet formula injection risk.
+
+The **Agent activity** page shows the selected job's saved execution status, attempt count, duration, and any recorded failure. It refreshes on a short interval while open. The **Data quality** page lists saved findings and supports severity filtering. It is a review screen: fix source data separately and re-upload it so original records and audit history remain intact.
 
 ### Index and retrieve land-data rules
 
