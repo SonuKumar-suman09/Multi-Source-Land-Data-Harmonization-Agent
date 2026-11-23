@@ -170,7 +170,12 @@ def _json_records(payload: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             row = {str(key): _json_value(value) for key, value in properties.items()}
             row["geometry"] = _json_value(feature.get("geometry"))
             rows.append(row)
-        metadata["source_crs"] = "EPSG:4326"
+        declared_crs = payload.get("crs")
+        crs_name = (((declared_crs or {}).get("properties") or {}).get("name") if isinstance(declared_crs, dict) else None)
+        try:
+            metadata["source_crs"] = CRS.from_user_input(crs_name).to_string() if crs_name else "EPSG:4326"
+        except CRSError as exc:
+            raise InvalidDataset(f"GeoJSON declares an invalid CRS: {crs_name}") from exc
         metadata["geometry_types"] = sorted(
             {
                 geometry.get("type")
@@ -287,6 +292,21 @@ def parse_dataset(filename: str, content: bytes) -> ParsedDataset:
             columns = [str(column) for column in frame.columns]
             metadata["sheet_names"] = workbook.sheet_names
             metadata["selected_sheet"] = sheet_name
+            if "Source_Metadata" in workbook.sheet_names:
+                details = pd.read_excel(workbook, sheet_name="Source_Metadata", header=None, dtype=object)
+                source_metadata = {}
+                for _, values in details.iterrows():
+                    if len(values) >= 2 and pd.notna(values.iloc[0]) and pd.notna(values.iloc[1]):
+                        source_metadata[str(values.iloc[0]).strip()] = str(values.iloc[1]).strip()
+                metadata["source_metadata"] = source_metadata
+                for key, value in source_metadata.items():
+                    normalized_key = re.sub(r"[^a-z]", "", key.lower())
+                    if normalized_key in {"coordinatereferencesystem", "crs"}:
+                        match = re.search(r"EPSG\s*:\s*\d+", value, re.IGNORECASE)
+                        if match:
+                            metadata["source_crs"] = CRS.from_user_input(match.group(0)).to_string()
+                    elif normalized_key in {"areaunit", "defaultareaunit"}:
+                        metadata["default_area_unit"] = value
         elif file_format in {"json", "geojson"}:
             try:
                 payload = json.loads(content.decode("utf-8-sig"))
