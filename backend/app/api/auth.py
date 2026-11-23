@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.entities import AuditLog, User, UserRole, Workspace, WorkspaceMembership
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from app.schemas.auth import LoginRequest, ProfileUpdateRequest, RegisterRequest, TokenResponse, UserResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -34,7 +34,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
     if exists is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists")
 
-    user = User(email=email, password_hash=hash_password(payload.password), role=UserRole.ANALYST)
+    user = User(email=email, display_name=payload.display_name, password_hash=hash_password(payload.password), role=UserRole.ANALYST)
     db.add(user)
     db.flush()
 
@@ -94,4 +94,29 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 @router.get("/me", response_model=UserResponse)
 def read_current_user(user: User = Depends(get_current_user)) -> UserResponse:
+    return UserResponse.model_validate(user)
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_current_user(
+    payload: ProfileUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserResponse:
+    """Update the profile name; sign-in email and role remain controlled fields."""
+    user.display_name = payload.display_name
+    memberships = db.scalars(
+        select(WorkspaceMembership).where(WorkspaceMembership.user_id == user.id)
+    ).all()
+    for membership in memberships:
+        db.add(AuditLog(
+            workspace_id=membership.workspace_id,
+            actor_id=user.id,
+            action="user.profile_updated",
+            object_type="user",
+            object_id=user.id,
+            details={"fields": ["display_name"]},
+        ))
+    db.commit()
+    db.refresh(user)
     return UserResponse.model_validate(user)

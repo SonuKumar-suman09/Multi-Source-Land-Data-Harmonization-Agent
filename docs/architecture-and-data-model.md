@@ -203,6 +203,7 @@ Interactive OpenAPI documentation is available at `http://localhost:8001/docs` w
 | `POST` | `/api/v1/auth/register` | Create an analyst account and personal workspace. |
 | `POST` | `/api/v1/auth/login` | Verify credentials and issue a short-lived JWT. |
 | `GET` | `/api/v1/auth/me` | Read the signed-in user's profile. |
+| `PATCH` | `/api/v1/auth/me` | Update the profile display name and write a workspace audit event. |
 | `GET` | `/api/v1/dashboard/summary` | Get workspace counts and recent processing jobs. |
 | `POST` | `/api/v1/ingestion/uploads` | Ingest one or more CSV, Excel, JSON, GeoJSON, or zipped Shapefile files. |
 | `GET` | `/api/v1/ingestion/jobs/{job_id}` | Read stored file and row summaries. |

@@ -68,9 +68,10 @@ Open `http://127.0.0.1:8000/docs` for the interactive API documentation. Availab
 | --- | --- | --- |
 | `GET` | `/health/live` | Process liveness check |
 | `GET` | `/health/ready` | PostgreSQL and Redis readiness check |
-| `POST` | `/api/v1/auth/register` | Create an analyst account and personal workspace |
+| `POST` | `/api/v1/auth/register` | Create an analyst account and personal workspace; `display_name` is optional |
 | `POST` | `/api/v1/auth/login` | Verify credentials and issue a bearer token |
 | `GET` | `/api/v1/auth/me` | Read the signed-in user's profile |
+| `PATCH` | `/api/v1/auth/me` | Save the signed-in user's display name |
 | `GET` | `/api/v1/dashboard/summary` | Read workspace-scoped persisted record and job metrics |
 | `GET` | `/api/v1/map/parcels` | Retrieve valid workspace parcel geometries as filtered GeoJSON |
 | `GET` | `/api/v1/reports/jobs/{job_id}` | Read report metrics, source provenance, findings, agent runs, and audit events |
@@ -157,6 +158,8 @@ The **Parcel map** view requests valid stored geometries from `/api/v1/map/parce
 The **Reports & audit** page is available from the dashboard navigation. Select a recent processing job to review source files, record-quality totals, validation findings, recorded agent executions, and the job's audit timeline. Download CSV for row-level data and lineage or PDF for a compact processing summary. Both downloads require sign-in and the job must belong to a workspace where the signed-in user is a member. CSV text fields are escaped to reduce spreadsheet formula injection risk.
 
 The **Agent activity** page shows the selected job's saved execution status, attempt count, duration, and any recorded failure. It refreshes on a short interval while open. The **Data quality** page lists saved findings and supports severity filtering. It is a review screen: fix source data separately and re-upload it so original records and audit history remain intact.
+
+Open **Account center** by selecting the avatar in the top bar or **Manage account** in the lower-left account menu. Edit and save the display name, and review sign-in email, workspace role, membership date, and active status. Email and role are read-only. The account menu keeps **Sign out** available, and the sign-in page includes a password visibility control.
 
 ### Index and retrieve land-data rules
 

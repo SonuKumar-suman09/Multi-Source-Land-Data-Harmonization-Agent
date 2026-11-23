@@ -20,11 +20,12 @@ def test_auth_register_login_and_protected_profile() -> None:
     try:
         registration = client.post(
             "/api/v1/auth/register",
-            json={"email": email, "password": password},
+            json={"email": email, "password": password, "display_name": "Sonu Kumar"},
         )
         assert registration.status_code == 201, registration.text
         registered = registration.json()
         assert registered["user"]["email"] == email
+        assert registered["user"]["display_name"] == "Sonu Kumar"
         assert registered["token_type"] == "bearer"
         assert "password_hash" not in registered["user"]
         user_id = registered["user"]["id"]
@@ -70,6 +71,21 @@ def test_auth_register_login_and_protected_profile() -> None:
         assert profile.status_code == 200, profile.text
         assert profile.json()["id"] == user_id
         assert profile.json()["role"] == "analyst"
+        assert profile.json()["display_name"] == "Sonu Kumar"
+
+        updated_profile = client.patch(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"display_name": "  Sonu   Kumar Sharma  "},
+        )
+        assert updated_profile.status_code == 200, updated_profile.text
+        assert updated_profile.json()["display_name"] == "Sonu Kumar Sharma"
+        invalid_name = client.patch(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"display_name": "   "},
+        )
+        assert invalid_name.status_code == 422
 
         dashboard = client.get(
             "/api/v1/dashboard/summary",

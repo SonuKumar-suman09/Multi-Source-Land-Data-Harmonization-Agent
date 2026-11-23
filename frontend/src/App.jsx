@@ -1,9 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import {
-  ArrowDownToLine, ArrowRight, BookOpen, Check, ChevronDown, CircleHelp, FileText,
+  ArrowDownToLine, ArrowRight, BookOpen, Check, ChevronDown, CircleHelp, Eye, EyeOff, FileText,
   Database, Files, FolderUp, Globe2, KeyRound, LandPlot, LoaderCircle,
   LogOut, Map as MapIcon, MapPinned, Menu, Plus, ShieldCheck, Sparkles, Upload,
-  X, TriangleAlert,
+  X, TriangleAlert, UserRound,
 } from "lucide-react";
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { apiRequest, clearSession, getToken, saveSession, uploadFiles } from "./services/api.js";
@@ -14,6 +14,7 @@ const ReportsPage = lazy(() => import("./pages/ReportsPage.jsx"));
 const KnowledgePage = lazy(() => import("./pages/KnowledgePage.jsx"));
 const AgentsPage = lazy(() => import("./pages/AgentsPage.jsx"));
 const QualityPage = lazy(() => import("./pages/QualityPage.jsx"));
+const AccountPage = lazy(() => import("./pages/AccountPage.jsx"));
 
 const sections = [
   { to: "/", label: "Overview", icon: LandPlot, end: true },
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="knowledge" element={<Suspense fallback={<LoadingScreen label="Loading knowledge base" compact />}><KnowledgePage /></Suspense>} />
         <Route path="agents" element={<Suspense fallback={<LoadingScreen label="Loading agent activity" compact />}><AgentsPage /></Suspense>} />
         <Route path="quality" element={<Suspense fallback={<LoadingScreen label="Loading quality review" compact />}><QualityPage /></Suspense>} />
+        <Route path="account" element={<Suspense fallback={<LoadingScreen label="Loading account center" compact />}><AccountPage user={auth.user} onUserUpdated={(user) => { saveSession(getToken(), user); setAuth((current) => ({ ...current, user })); }} /></Suspense>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -63,7 +65,9 @@ export default function App() {
 function AuthPage({ onAuthenticated, initialError }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError || "");
   const submit = async (event) => {
@@ -72,7 +76,8 @@ function AuthPage({ onAuthenticated, initialError }) {
     setBusy(true);
     try {
       const endpoint = mode === "login" ? "/api/v1/auth/login" : "/api/v1/auth/register";
-      const session = await apiRequest(endpoint, { method: "POST", body: JSON.stringify({ email, password }) });
+      const payload = { email, password, ...(mode === "register" && displayName.trim() ? { display_name: displayName.trim() } : {}) };
+      const session = await apiRequest(endpoint, { method: "POST", body: JSON.stringify(payload) });
       saveSession(session.access_token, session.user);
       onAuthenticated(session.user);
     } catch (requestError) {
@@ -104,8 +109,9 @@ function AuthPage({ onAuthenticated, initialError }) {
             <button className={mode === "register" ? "selected" : ""} onClick={() => { setMode("register"); setError(""); }}>Create account</button>
           </div>
           <form onSubmit={submit} className="auth-form">
+            {mode === "register" && <label>Your name (optional)<input type="text" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="e.g. Sonu Kumar" autoComplete="name" maxLength={120} minLength={2} /></label>}
             <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@organization.org" autoComplete="email" required /></label>
-            <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "register" ? "At least 12 characters" : "Enter your password"} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "register" ? 12 : 1} required /></label>
+            <label>Password<span className="auth-password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "register" ? "At least 12 characters" : "Enter your password"} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "register" ? 12 : 1} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></span></label>
             {error && <InlineNotice tone="error">{error}</InlineNotice>}
             <button className="button button-primary auth-submit" disabled={busy}>
               {busy ? <LoaderCircle className="spin" size={17} /> : <KeyRound size={16} />}
@@ -125,12 +131,13 @@ function ProtectedLayout({ user, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const location = useLocation();
-  const pageTitle = ({ "/upload": "Upload datasets", "/map": "Parcel map", "/reports": "Reports & audit", "/knowledge": "Knowledge base", "/agents": "Agent activity", "/quality": "Data quality" })[location.pathname] || "Overview";
+  const navigate = useNavigate();
+  const pageTitle = ({ "/upload": "Upload datasets", "/map": "Parcel map", "/reports": "Reports & audit", "/knowledge": "Knowledge base", "/agents": "Agent activity", "/quality": "Data quality", "/account": "Account center" })[location.pathname] || "Overview";
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
         <NavLink to="/" className="brand"><span className="brand-symbol"><LandPlot size={19} /></span><span>TERRAFORM</span></NavLink>
-        <div className="workspace-switcher"><span className="workspace-mark">{user.email?.slice(0, 1).toUpperCase()}</span><span className="workspace-label"><small>WORKSPACE</small><b>My land records</b></span></div>
+        <div className="workspace-switcher"><span className="workspace-mark">{(user.display_name || user.email)?.slice(0, 1).toUpperCase()}</span><span className="workspace-label"><small>WORKSPACE</small><b>My land records</b></span></div>
         <div className="nav-label">WORKSPACE</div>
         <nav className="side-nav">
           {sections.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={() => setMobileNav(false)} className={({ isActive }) => `nav-item ${isActive ? "nav-active" : ""}`}><Icon size={17} strokeWidth={1.8} /><span>{label}</span>{label === "Upload datasets" && <span className="nav-plus"><Plus size={14} /></span>}</NavLink>)}
@@ -139,11 +146,11 @@ function ProtectedLayout({ user, onLogout }) {
         <div className="pipeline-step"><span className="step-number">01</span><span>Ingest sources</span></div>
         <div className="pipeline-step"><span className="step-number">02</span><span>Harmonize fields</span></div>
         <div className="pipeline-step"><span className="step-number">03</span><span>Quality review</span></div>
-        <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={16} /></div><b>Source integrity</b><span>Original uploads remain unchanged</span><ShieldCheck size={14} /></div><div className="user-menu-wrap"><button className="user-menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><span className="avatar">{user.email?.slice(0, 1).toUpperCase()}</span><span className="user-info"><b>{user.email}</b><small>{user.role || "Analyst"}</small></span><ChevronDown size={15} /></button>{menuOpen && <div className="user-popover"><button onClick={onLogout}><LogOut size={15} /> Sign out</button></div>}</div></div>
+        <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={16} /></div><b>Source integrity</b><span>Original uploads remain unchanged</span><ShieldCheck size={14} /></div><div className="user-menu-wrap"><button className="user-menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><span className="avatar">{(user.display_name || user.email)?.slice(0, 1).toUpperCase()}</span><span className="user-info"><b>{user.display_name || user.email}</b><small>{user.role || "Analyst"}</small></span><ChevronDown size={15} /></button>{menuOpen && <div className="user-popover"><NavLink to="/account" onClick={() => setMenuOpen(false)}><UserRound size={15} /> Manage account</NavLink><button onClick={onLogout}><LogOut size={15} /> Sign out</button></div>}</div></div>
       </aside>
       {mobileNav && <button className="nav-scrim" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
       <main className="main-shell">
-        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-sep">/</span><b>{pageTitle}</b></div><div className="topbar-right"><div className="api-indicator"><span className="api-dot" /> Workspace metrics</div><button className="top-avatar" title={user.email}>{user.email?.slice(0, 1).toUpperCase()}</button></div></header>
+        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-sep">/</span><b>{pageTitle}</b></div><div className="topbar-right"><div className="api-indicator"><span className="api-dot" /> Workspace metrics</div><button className="top-avatar" title="Open account center" onClick={() => navigate("/account")}>{(user.display_name || user.email)?.slice(0, 1).toUpperCase()}</button></div></header>
         <div className="page-content"><Outlet /></div>
       </main>
     </div>
@@ -168,7 +175,7 @@ function DashboardPage({ user }) {
   useEffect(() => { load(); const interval = window.setInterval(load, 15000); return () => window.clearInterval(interval); }, [load]);
   return (
     <>
-      <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR LAND DATA, AT A GLANCE</div><h1>Good to see you, {user.email?.split("@")[0]}</h1><p>Track incoming datasets, harmonization, and review across your workspace.</p></div><NavLink to="/upload" className="button button-primary"><Upload size={16} /> Upload datasets</NavLink></div>
+      <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR LAND DATA, AT A GLANCE</div><h1>Good to see you, {user.display_name || user.email?.split("@")[0]}</h1><p>Track incoming datasets, harmonization, and review across your workspace.</p></div><NavLink to="/upload" className="button button-primary"><Upload size={16} /> Upload datasets</NavLink></div>
       {error && <InlineNotice tone="error">Dashboard data could not load: {error} <button className="notice-action" onClick={load}>Retry</button></InlineNotice>}
       {loading && !summary ? <LoadingScreen label="Loading workspace metrics" compact /> : <>
         <section className="metric-grid">

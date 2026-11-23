@@ -59,6 +59,8 @@ a { color: inherit; text-decoration: none; }
 .user-popover { position: absolute; z-index: 10; right: 0; bottom: 48px; width: 155px; padding: 5px; border: 1px solid #38554c; border-radius: 8px; background: #1c3932; box-shadow: 0 10px 25px #081c1780; }
 .user-popover button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 9px; border: 0; border-radius: 5px; color: #e5efea; background: transparent; font-size: 11px; }
 .user-popover button:hover { background: #2c4e42; }
+.user-popover a { width: 100%; display: flex; align-items: center; gap: 8px; padding: 9px; border-radius: 5px; color: #e5efea; font-size: 11px; }
+.user-popover a:hover { background: #2c4e42; }
 .main-shell { min-height: 100vh; margin-left: 250px; }
 .topbar { position: sticky; top: 0; z-index: 20; height: 65px; display: flex; align-items: center; justify-content: space-between; padding: 0 38px; border-bottom: 1px solid #e7ece9; background: #fbfcfbeb; backdrop-filter: blur(14px); }
 .breadcrumbs { display: flex; align-items: center; gap: 10px; color: #9aa59f; font-size: 11px; }
@@ -265,6 +267,27 @@ a { color: inherit; text-decoration: none; }
 .subtle-empty { padding: 15px 0 3px; border-top: 1px solid #f0f3f1; color: #9aa59e; font-size: 9px; }
 
 .knowledge-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.account-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.account-panel { display: grid; gap: 18px; padding: 20px; }
+.account-panel-heading { display: flex; align-items: flex-start; gap: 12px; }
+.account-icon { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: #367b60; background: #edf5ef; }
+.account-icon-blue { color: #4e7482; background: #edf4f6; }
+.account-panel-heading h2 { margin: 4px 0; color: #2d3d36; font-size: 15px; font-weight: 650; }
+.account-panel-heading p { margin: 0; color: #8d9a92; font-size: 10px; line-height: 1.5; }
+.account-panel .field-label { font-size: 11px; }
+.account-details { display: grid; gap: 0; }
+.account-detail { display: flex; align-items: center; gap: 10px; min-height: 58px; border-top: 1px solid #eff2f0; }
+.account-detail > span { display: grid; width: 29px; height: 29px; flex: 0 0 auto; place-items: center; border-radius: 8px; color: #57816b; background: #f0f6f1; }
+.account-detail > div { display: grid; gap: 4px; min-width: 0; }
+.account-detail small { color: #8f9b94; font-size: 9px; }
+.account-detail b { overflow-wrap: anywhere; color: #4b5e53; font-size: 11px; font-weight: 600; text-transform: capitalize; }
+.account-readonly-note { margin: -8px 0 0; color: #98a49d; font-size: 9px; }
+.account-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 13px; border-top: 1px solid #edf1ee; }
+.account-actions > span { display: flex; align-items: center; gap: 6px; color: #83948a; font-size: 9px; }
+.auth-password-field { position: relative; display: flex; align-items: center; }
+.auth-password-field input { padding-right: 42px; }
+.auth-password-field button { position: absolute; right: 4px; display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 5px; color: #718278; background: transparent; }
+.auth-password-field button:hover { color: #315f4b; background: #f0f5f1; }
 .knowledge-panel { padding: 17px; }
 .knowledge-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; color: #3d795d !important; background: #edf5ef; }
 .knowledge-spark { color: #9a7439 !important; background: #fbf4e7; }
@@ -408,7 +431,7 @@ a { color: inherit; text-decoration: none; }
   .sidebar { width: 220px; }
   .main-shell { margin-left: 220px; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .insight-grid, .upload-layout, .knowledge-grid { grid-template-columns: 1fr; }
+  .insight-grid, .upload-layout, .knowledge-grid, .account-layout { grid-template-columns: 1fr; }
   .insight-grid .panel { min-height: 280px; }
   .upload-aside { grid-template-columns: 1fr 1fr; }
   .auth-page { grid-template-columns: minmax(300px, .75fr) minmax(450px, 1.25fr); }
