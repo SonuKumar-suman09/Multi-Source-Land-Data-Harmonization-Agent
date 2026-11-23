@@ -16,6 +16,7 @@ Project presentation materials:
 
 - [System architecture, agent workflow, database ER diagram, API reference](docs/architecture-and-data-model.md)
 - [Demo script, interview questions, resume description, two-minute explanation](docs/demo-and-interview-guide.md)
+- [Render deployment setup and cost estimate](docs/deployment-render.md)
 
 All sample records are fictional and do not represent government records.
 

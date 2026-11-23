@@ -1,0 +1,107 @@
+services:
+  - type: web
+    name: landsync-api
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    preDeployCommand: python -m alembic -c backend/alembic.ini upgrade head
+    disk:
+      name: source-uploads
+      mountPath: /app/data/uploads
+      sizeGB: 1
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_NAME
+        value: Land Data Harmonization Agent
+      - key: DATABASE_URL
+        fromDatabase:
+          name: landsync-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: landsync-redis
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ACCESS_TOKEN_MINUTES
+        value: "30"
+      - key: FRONTEND_ORIGINS
+        value: https://landsync-dashboard.onrender.com
+      - key: UPLOAD_DIR
+        value: /app/data/uploads
+      - key: STORAGE_BACKEND
+        value: local
+      - key: MAX_UPLOAD_MB
+        value: "100"
+      - key: RAG_EMBEDDING_PROVIDER
+        value: local
+
+  - type: worker
+    name: landsync-worker
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    dockerCommand: celery -A app.tasks.celery_app:celery_app worker --loglevel=info --concurrency=2
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: landsync-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: landsync-redis
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        fromService:
+          type: web
+          name: landsync-api
+          envVarKey: JWT_SECRET_KEY
+      - key: UPLOAD_DIR
+        value: /app/data/uploads
+      - key: STORAGE_BACKEND
+        value: local
+      - key: RAG_EMBEDDING_PROVIDER
+        value: local
+
+  - type: keyvalue
+    name: landsync-redis
+    region: singapore
+    plan: 256mb
+    maxmemoryPolicy: noeviction
+    persistenceMode: journal-snapshot
+    ipAllowList: []
+
+  - type: web
+    name: landsync-dashboard
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /health/ready
+    envVars:
+      - key: API_UPSTREAM
+        fromService:
+          type: web
+          name: landsync-api
+          property: hostport
+
+databases:
+  - name: landsync-db
+    region: singapore
+    plan: 0.1c-256mb
+    diskSizeGB: 1
+    postgresMajorVersion: "17"
+    databaseName: land_harmonizer
+    user: landsync_app
+    ipAllowList: []
