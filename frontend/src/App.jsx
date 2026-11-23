@@ -2,17 +2,19 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import {
   ArrowDownToLine, ArrowRight, Check, ChevronDown, CircleHelp,
   Database, Files, FolderUp, Globe2, KeyRound, LandPlot, LoaderCircle,
-  LogOut, MapPinned, Menu, Plus, ShieldCheck, Sparkles, Upload,
+  LogOut, Map as MapIcon, MapPinned, Menu, Plus, ShieldCheck, Sparkles, Upload,
   X, TriangleAlert,
 } from "lucide-react";
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { apiRequest, clearSession, getToken, saveSession, uploadFiles } from "./services/api.js";
 
 const DashboardCharts = lazy(() => import("./components/DashboardCharts.jsx"));
+const MapPage = lazy(() => import("./pages/MapPage.jsx"));
 
 const sections = [
   { to: "/", label: "Overview", icon: LandPlot, end: true },
   { to: "/upload", label: "Upload datasets", icon: FolderUp },
+  { to: "/map", label: "Parcel map", icon: MapIcon },
 ];
 
 export default function App() {
@@ -39,6 +41,7 @@ export default function App() {
       <Route element={<ProtectedLayout user={auth.user} onLogout={() => { clearSession(); setAuth({ user: null, loading: false }); }} />}>
         <Route index element={<DashboardPage user={auth.user} />} />
         <Route path="upload" element={<UploadPage />} />
+        <Route path="map" element={<Suspense fallback={<LoadingScreen label="Loading parcel map" compact />}><MapPage /></Suspense>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -127,7 +130,7 @@ function ProtectedLayout({ user, onLogout }) {
       </aside>
       {mobileNav && <button className="nav-scrim" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
       <main className="main-shell">
-        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-sep">/</span><b>{location.pathname === "/upload" ? "Upload datasets" : "Overview"}</b></div><div className="topbar-right"><div className="api-indicator"><span className="api-dot" /> Workspace metrics</div><button className="top-avatar" title={user.email}>{user.email?.slice(0, 1).toUpperCase()}</button></div></header>
+        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Open menu"><Menu size={19} /></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-sep">/</span><b>{location.pathname === "/upload" ? "Upload datasets" : location.pathname === "/map" ? "Parcel map" : "Overview"}</b></div><div className="topbar-right"><div className="api-indicator"><span className="api-dot" /> Workspace metrics</div><button className="top-avatar" title={user.email}>{user.email?.slice(0, 1).toUpperCase()}</button></div></header>
         <div className="page-content"><Outlet /></div>
       </main>
     </div>

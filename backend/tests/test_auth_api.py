@@ -52,6 +52,8 @@ def test_auth_register_login_and_protected_profile() -> None:
         assert unauthorized.status_code == 401
         protected_dashboard = client.get("/api/v1/dashboard/summary")
         assert protected_dashboard.status_code == 401
+        protected_map = client.get("/api/v1/map/parcels")
+        assert protected_map.status_code == 401
 
         invalid_token = client.get(
             "/api/v1/auth/me",
@@ -75,6 +77,12 @@ def test_auth_register_login_and_protected_profile() -> None:
         assert dashboard.json()["dataset_count"] == 0
         assert dashboard.json()["raw_record_count"] == 0
         assert dashboard.json()["recent_jobs"] == []
+        parcel_map = client.get(
+            "/api/v1/map/parcels",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert parcel_map.status_code == 200, parcel_map.text
+        assert parcel_map.json() == {"type": "FeatureCollection", "features": [], "count": 0}
     finally:
         if user_id is not None:
             with SessionLocal.begin() as db:

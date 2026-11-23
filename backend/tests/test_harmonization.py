@@ -90,6 +90,39 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
         assert summary["duplicate_pairs"] >= 2
         assert summary["validation_findings"] > 0
 
+        parcel_map = client.get("/api/v1/map/parcels", headers=headers)
+        assert parcel_map.status_code == 200, parcel_map.text
+        feature_collection = parcel_map.json()
+        assert feature_collection["type"] == "FeatureCollection"
+        assert feature_collection["count"] == len(feature_collection["features"])
+        assert feature_collection["count"] > 0
+        assert all(feature["geometry"] is not None for feature in feature_collection["features"])
+        assert all(feature["properties"]["status"] for feature in feature_collection["features"])
+
+        plot_search = client.get("/api/v1/map/parcels", headers=headers, params={"search": "K-102"})
+        assert plot_search.status_code == 200
+        assert plot_search.json()["count"] > 0
+        assert all("K-102" in (feature["properties"]["plot_id"] or "") for feature in plot_search.json()["features"])
+
+        bounded_map = client.get(
+            "/api/v1/map/parcels",
+            headers=headers,
+            params={"min_lon": 77, "min_lat": 28, "max_lon": 78, "max_lat": 29},
+        )
+        assert bounded_map.status_code == 200
+        assert bounded_map.json()["count"] > 0
+
+        conflict_map = client.get(
+            "/api/v1/map/parcels", headers=headers, params={"status": "conflict"}
+        )
+        assert conflict_map.status_code == 200
+        assert all(feature["properties"]["status"] == "conflict" for feature in conflict_map.json()["features"])
+
+        incomplete_bbox = client.get(
+            "/api/v1/map/parcels", headers=headers, params={"min_lon": 77, "min_lat": 28}
+        )
+        assert incomplete_bbox.status_code == 422
+
         policy_content = b"Policy: plot identifiers are required. Area must be positive, geometry must be valid, and ownership cannot be inferred."
         knowledge_upload = client.post(
             "/api/v1/knowledge/documents", headers=headers,
