@@ -6,13 +6,13 @@ An incremental project for safely ingesting, harmonizing, validating, and review
 
 Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture.md). Phase 2 has the project skeleton and synthetic CSV, Excel, and GeoJSON inputs. Phase 3 is running locally with PostgreSQL 17, PostGIS 3.7, pgvector 0.8.7, SQLAlchemy models, and the initial Alembic migration. The database is available at `127.0.0.1:5433` because Windows would not allow Docker to bind host port `5432`. Phase 4 provides JWT authentication, Argon2 password hashing, protected routes, health checks, and a default workspace for each account. Phase 5 adds authenticated CSV, Excel, JSON, GeoJSON, and zipped Shapefile ingestion with immutable local originals, hashes, metadata, and raw-row lineage. Phase 6 adds deterministic alias-based harmonization, area normalization to acres, CRS conversion to EPSG:4326, validation findings, duplicate/conflict candidates, and row-level transformation provenance. Phase 7 adds an authenticated, repeat-safe quality assurance pass using Pandera canonical-schema checks, deterministic land rules, PostGIS geometry validation, and polygon-overlap detection. Phase 8 adds a LangGraph coordinator with ingestion verification, harmonization and QA nodes, retry policy for transient database failures, PostgreSQL checkpoints, and auditable workflow status. Phase 9 adds workspace-scoped rule-document indexing, Gemini embeddings, pgvector semantic retrieval, and retrieved rule references in QA reports. Phase 10 runs the same checkpointed workflow as a durable Celery task using Redis, with queued/running/completed/failed state, idempotent enqueue behavior, retry handling for transient database connectivity errors, and readiness checks for both PostgreSQL and Redis. Phase 11 starts the React dashboard with JWT sign-in/registration, a real workspace metrics API, recent job activity, quality charts, and multi-file upload that queues the background workflow. Phase 12 adds an authenticated, workspace-scoped GeoJSON API backed by stored EPSG:4326 geometries plus a React Leaflet map with status/search filtering, parcel selection, map fitting, and record details.
 
-Phase 13 adds workspace-scoped JSON, CSV, and PDF reports for each processing job, including source-file provenance, agent execution history, audit events, validation findings, record counts, duplicate counts, and quality score. The React **Reports & audit** page selects a recent job and downloads its CSV or PDF. The CSV keeps raw source values and transformation lineage alongside harmonized records; the PDF summarizes the run for sharing and review.
+Phase 13 adds workspace-scoped JSON, CSV, and PDF reports for each processing job, including source-file provenance, agent execution history, audit events, validation findings, record counts, duplicate counts, and quality score. The React **Reports & audit** page selects a recent job and downloads its CSV or PDF. The CSV keeps raw source values and transformation lineage alongside harmonized records; the PDF summarizes the run for sharing and review. Phase 14 adds integration and security tests for report downloads, spreadsheet formula escaping, and workspace isolation. Phase 15 packages the database, API, Celery worker, and React dashboard as a Docker Compose application with health checks, ordered migrations, persistent local data volumes, and a same-origin Nginx API proxy.
 
 All sample records are fictional and do not represent government records.
 
 ## Local bootstrap (PowerShell)
 
-Run these commands from the repository root. Python 3.11 or newer is required.
+Run these commands from the repository root. Python 3.14 is the tested local version for the pinned dependencies.
 
 ```powershell
 python --version
@@ -26,6 +26,26 @@ python data/sample/create_fixtures.py
 The expected fixture counts are 5 CSV rows, 3 Excel parcel rows, and 3 GeoJSON features. `backend/requirements.txt` contains the pinned runtime stack through the RAG phase, including Pandera, LangGraph/PostgreSQL checkpoints, and the Gemini LangChain integration.
 
 Copy `.env.example` to `.env` if it does not already exist to configure local services. Set `JWT_SECRET_KEY` to a random value of at least 32 characters; do not commit `.env` or user uploads. Database startup, migration, and verification commands are in [`database/README.md`](database/README.md). Redis runs in the same Docker Compose project and is exposed only on localhost by default.
+
+## Run the full application with Docker
+
+Docker Desktop must be running. Copy `.env.example` to `.env` if needed, then replace `JWT_SECRET_KEY` with a unique random value before starting the stack. Docker maps the frontend to port `8080` and API docs to `8001` by default, avoiding the usual local development ports. From the repository root in PowerShell:
+
+```powershell
+docker compose up --build -d
+docker compose ps
+```
+
+Wait until `db`, `redis`, `api`, and `frontend` show healthy/running and the one-shot `migrate` service exits successfully. Open `http://localhost:8080` for the dashboard or `http://localhost:8001/docs` for API docs. The frontend forwards API calls through Nginx to the API container, so the browser uses one origin. Celery workers process queued workflows in the background. Uploaded files, knowledge documents, and processed data remain in the local `data/` folders; database and Redis state use Docker volumes.
+
+Useful commands:
+
+```powershell
+docker compose logs -f api worker
+docker compose down
+```
+
+`docker compose down` stops and removes the containers while keeping database/Redis volumes and local files. Use `docker compose down -v` only when intentionally deleting the stored database and Redis data.
 
 ## Run the API
 
