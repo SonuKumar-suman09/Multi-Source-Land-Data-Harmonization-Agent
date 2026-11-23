@@ -4,7 +4,7 @@ An incremental project for safely ingesting, harmonizing, validating, and review
 
 ## Current milestone
 
-Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture.md). Phase 2 has the project skeleton and synthetic CSV, Excel, and GeoJSON inputs. Phase 3 is running locally with PostgreSQL 17, PostGIS 3.7, pgvector 0.8.7, SQLAlchemy models, and the initial Alembic migration. The database is available at `127.0.0.1:5433` because Windows would not allow Docker to bind host port `5432`. Phase 4 provides JWT authentication, Argon2 password hashing, protected routes, health checks, and a default workspace for each account. Phase 5 adds authenticated CSV, Excel, JSON, GeoJSON, and zipped Shapefile ingestion with immutable local originals, hashes, metadata, and raw-row lineage. Phase 6 adds deterministic alias-based harmonization, area normalization to acres, CRS conversion to EPSG:4326, validation findings, duplicate/conflict candidates, and row-level transformation provenance. Phase 7 adds an authenticated, repeat-safe quality assurance pass using Pandera canonical-schema checks, deterministic land rules, PostGIS geometry validation, and polygon-overlap detection. Phase 8 adds a LangGraph coordinator with ingestion verification, harmonization and QA nodes, retry policy for transient database failures, PostgreSQL checkpoints, and auditable workflow status. Phase 9 adds workspace-scoped rule-document indexing, Gemini embeddings, pgvector semantic retrieval, and retrieved rule references in QA reports. Phase 10 runs the same checkpointed workflow as a durable Celery task using Redis, with queued/running/completed/failed state, idempotent enqueue behavior, retry handling for transient database connectivity errors, and readiness checks for both PostgreSQL and Redis.
+Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture.md). Phase 2 has the project skeleton and synthetic CSV, Excel, and GeoJSON inputs. Phase 3 is running locally with PostgreSQL 17, PostGIS 3.7, pgvector 0.8.7, SQLAlchemy models, and the initial Alembic migration. The database is available at `127.0.0.1:5433` because Windows would not allow Docker to bind host port `5432`. Phase 4 provides JWT authentication, Argon2 password hashing, protected routes, health checks, and a default workspace for each account. Phase 5 adds authenticated CSV, Excel, JSON, GeoJSON, and zipped Shapefile ingestion with immutable local originals, hashes, metadata, and raw-row lineage. Phase 6 adds deterministic alias-based harmonization, area normalization to acres, CRS conversion to EPSG:4326, validation findings, duplicate/conflict candidates, and row-level transformation provenance. Phase 7 adds an authenticated, repeat-safe quality assurance pass using Pandera canonical-schema checks, deterministic land rules, PostGIS geometry validation, and polygon-overlap detection. Phase 8 adds a LangGraph coordinator with ingestion verification, harmonization and QA nodes, retry policy for transient database failures, PostgreSQL checkpoints, and auditable workflow status. Phase 9 adds workspace-scoped rule-document indexing, Gemini embeddings, pgvector semantic retrieval, and retrieved rule references in QA reports. Phase 10 runs the same checkpointed workflow as a durable Celery task using Redis, with queued/running/completed/failed state, idempotent enqueue behavior, retry handling for transient database connectivity errors, and readiness checks for both PostgreSQL and Redis. Phase 11 starts the React dashboard with JWT sign-in/registration, a real workspace metrics API, recent job activity, quality charts, and multi-file upload that queues the background workflow.
 
 All sample records are fictional and do not represent government records.
 
@@ -42,6 +42,7 @@ Open `http://127.0.0.1:8000/docs` for the interactive API documentation. Availab
 | `POST` | `/api/v1/auth/register` | Create an analyst account and personal workspace |
 | `POST` | `/api/v1/auth/login` | Verify credentials and issue a bearer token |
 | `GET` | `/api/v1/auth/me` | Read the signed-in user's profile |
+| `GET` | `/api/v1/dashboard/summary` | Read workspace-scoped persisted record and job metrics |
 | `POST` | `/api/v1/ingestion/uploads` | Ingest one or more files for a named source |
 | `GET` | `/api/v1/ingestion/jobs/{job_id}` | Read the stored ingestion summary |
 | `POST` | `/api/v1/harmonization/jobs/{job_id}/run` | Harmonize an ingested job and record findings and lineage |
@@ -104,6 +105,19 @@ python -m pytest backend/tests/test_celery_workflow_e2e.py -q
 ```
 
 The optional check creates a synthetic account and upload, enqueues the job, waits for completion, verifies the persisted agent execution, and removes its test data. It is skipped in the standard suite unless `RUN_CELERY_E2E=1` is set.
+
+### Run the React dashboard
+
+Start the API and the Celery worker as described above, then open another VS Code terminal:
+
+```powershell
+node --version
+Set-Location frontend
+npm install
+npm run dev
+```
+
+Open the Vite URL shown in the terminal (normally `http://localhost:5173`). Register an account or sign in, then upload a synthetic source batch. The overview reads actual workspace-scoped counts from `/api/v1/dashboard/summary`; it does not fill empty states with sample metrics. Uploaded files are sent to the FastAPI ingestion endpoint and then queued for the Celery workflow. `VITE_API_URL` can override the API base URL when it is not `http://127.0.0.1:8000`.
 
 ### Index and retrieve land-data rules
 

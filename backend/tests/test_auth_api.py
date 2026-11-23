@@ -50,6 +50,8 @@ def test_auth_register_login_and_protected_profile() -> None:
 
         unauthorized = client.get("/api/v1/auth/me")
         assert unauthorized.status_code == 401
+        protected_dashboard = client.get("/api/v1/dashboard/summary")
+        assert protected_dashboard.status_code == 401
 
         invalid_token = client.get(
             "/api/v1/auth/me",
@@ -64,6 +66,15 @@ def test_auth_register_login_and_protected_profile() -> None:
         assert profile.status_code == 200, profile.text
         assert profile.json()["id"] == user_id
         assert profile.json()["role"] == "analyst"
+
+        dashboard = client.get(
+            "/api/v1/dashboard/summary",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert dashboard.status_code == 200, dashboard.text
+        assert dashboard.json()["dataset_count"] == 0
+        assert dashboard.json()["raw_record_count"] == 0
+        assert dashboard.json()["recent_jobs"] == []
     finally:
         if user_id is not None:
             with SessionLocal.begin() as db:
