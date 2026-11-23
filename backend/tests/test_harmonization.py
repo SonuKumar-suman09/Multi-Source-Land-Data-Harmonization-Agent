@@ -6,12 +6,12 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from app.database.session import SessionLocal
 from app.main import app
 from app.models.entities import (
-    AuditLog, DataSource, DuplicateRecord, HarmonizedLandRecord, ProcessingJob,
+    AgentExecution, AuditLog, DataSource, DuplicateRecord, HarmonizedLandRecord, ProcessingJob,
     RawLandRecord, RecordProvenance, SchemaMapping, User, ValidationResult,
     Workspace, WorkspaceMembership,
 )
@@ -101,6 +101,20 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
         assert repeated_quality.status_code == 200
         assert repeated_quality.json()["already_completed"] is True
 
+        workflow = client.post(f"/api/v1/workflows/jobs/{job_id}/run", headers=headers)
+        assert workflow.status_code == 200, workflow.text
+        workflow_result = workflow.json()
+        assert workflow_result["stage"] == "completed"
+        assert [event["node"] for event in workflow_result["events"]] == [
+            "orchestrator", "ingestion", "harmonization", "quality_assurance", "orchestrator"
+        ]
+        workflow_status = client.get(f"/api/v1/workflows/jobs/{job_id}", headers=headers)
+        assert workflow_status.status_code == 200
+        assert workflow_status.json()["stage"] == "completed"
+        rerun_workflow = client.post(f"/api/v1/workflows/jobs/{job_id}/run", headers=headers)
+        assert rerun_workflow.status_code == 200
+        assert rerun_workflow.json()["already_completed"] is True
+
         with SessionLocal() as db:
             records = db.scalars(select(HarmonizedLandRecord).where(HarmonizedLandRecord.job_id == job_id)).all()
             assert len(records) == 11
@@ -108,6 +122,13 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
             assert db.scalar(select(SchemaMapping.id).where(SchemaMapping.job_id == job_id))
             assert db.scalar(select(DuplicateRecord.id).where(DuplicateRecord.job_id == job_id))
             assert db.scalar(select(ValidationResult.id).where(ValidationResult.job_id == job_id))
+            execution = db.scalar(select(AgentExecution).where(AgentExecution.job_id == job_id, AgentExecution.agent_name == "workflow_orchestrator"))
+            assert execution is not None and execution.status == "completed"
+            checkpoint_count = db.scalar(
+                text("SELECT count(*) FROM checkpoints WHERE thread_id = :thread_id"),
+                {"thread_id": f"land-harmonization:{job_id}"},
+            )
+            assert checkpoint_count and checkpoint_count > 0
             hectares_record = next(record for record in records if record.plot_id == "K-102" and record.source_crs and "32643" in record.source_crs)
             assert hectares_record.area_acres == Decimal("1.260237")
             assert hectares_record.geometry is not None
@@ -117,6 +138,10 @@ def test_harmonization_endpoint_processes_fixture_batch_with_lineage() -> None:
     finally:
         if user_id is not None and workspace_id is not None:
             with SessionLocal.begin() as db:
+                if job_id is not None and db.scalar(text("SELECT to_regclass('public.checkpoints')")):
+                    thread_id = f"land-harmonization:{job_id}"
+                    for table_name in ("checkpoint_writes", "checkpoint_blobs", "checkpoints"):
+                        db.execute(text(f"DELETE FROM {table_name} WHERE thread_id = :thread_id"), {"thread_id": thread_id})
                 db.execute(delete(AuditLog).where(AuditLog.workspace_id == workspace_id))
                 db.execute(delete(ProcessingJob).where(ProcessingJob.workspace_id == workspace_id))
                 db.execute(delete(DataSource).where(DataSource.workspace_id == workspace_id))

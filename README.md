@@ -4,7 +4,7 @@ An incremental project for safely ingesting, harmonizing, validating, and review
 
 ## Current milestone
 
-Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture.md). Phase 2 has the project skeleton and synthetic CSV, Excel, and GeoJSON inputs. Phase 3 is running locally with PostgreSQL 17, PostGIS 3.7, pgvector 0.8.7, SQLAlchemy models, and the initial Alembic migration. The database is available at `127.0.0.1:5433` because Windows would not allow Docker to bind host port `5432`. Phase 4 provides JWT authentication, Argon2 password hashing, protected routes, health checks, and a default workspace for each account. Phase 5 adds authenticated CSV, Excel, JSON, GeoJSON, and zipped Shapefile ingestion with immutable local originals, hashes, metadata, and raw-row lineage. Phase 6 adds deterministic alias-based harmonization, area normalization to acres, CRS conversion to EPSG:4326, validation findings, duplicate/conflict candidates, and row-level transformation provenance. Phase 7 adds an authenticated, repeat-safe quality assurance pass using Pandera canonical-schema checks, deterministic land rules, PostGIS geometry validation, and polygon-overlap detection.
+Phase 1 architecture is documented in [`docs/architecture.md`](docs/architecture.md). Phase 2 has the project skeleton and synthetic CSV, Excel, and GeoJSON inputs. Phase 3 is running locally with PostgreSQL 17, PostGIS 3.7, pgvector 0.8.7, SQLAlchemy models, and the initial Alembic migration. The database is available at `127.0.0.1:5433` because Windows would not allow Docker to bind host port `5432`. Phase 4 provides JWT authentication, Argon2 password hashing, protected routes, health checks, and a default workspace for each account. Phase 5 adds authenticated CSV, Excel, JSON, GeoJSON, and zipped Shapefile ingestion with immutable local originals, hashes, metadata, and raw-row lineage. Phase 6 adds deterministic alias-based harmonization, area normalization to acres, CRS conversion to EPSG:4326, validation findings, duplicate/conflict candidates, and row-level transformation provenance. Phase 7 adds an authenticated, repeat-safe quality assurance pass using Pandera canonical-schema checks, deterministic land rules, PostGIS geometry validation, and polygon-overlap detection. Phase 8 adds a LangGraph coordinator with ingestion verification, harmonization and QA nodes, retry policy for transient database failures, PostgreSQL checkpoints, and auditable workflow status.
 
 All sample records are fictional and do not represent government records.
 
@@ -21,7 +21,7 @@ python -m pip install -r backend/requirements-dev.txt
 python data/sample/create_fixtures.py
 ```
 
-The expected fixture counts are 5 CSV rows, 3 Excel parcel rows, and 3 GeoJSON features. `backend/requirements.txt` contains the fixture dependency and the current database foundation dependencies.
+The expected fixture counts are 5 CSV rows, 3 Excel parcel rows, and 3 GeoJSON features. `backend/requirements.txt` contains the pinned runtime stack through the LangGraph workflow phase, including Pandera and the PostgreSQL checkpoint saver.
 
 Copy `.env.example` to `.env` if it does not already exist to configure local services. Set `JWT_SECRET_KEY` to a random value of at least 32 characters; do not commit `.env` or user uploads. Database startup, migration, and verification commands are in [`database/README.md`](database/README.md).
 
@@ -46,6 +46,8 @@ Open `http://127.0.0.1:8000/docs` for the interactive API documentation. Availab
 | `GET` | `/api/v1/ingestion/jobs/{job_id}` | Read the stored ingestion summary |
 | `POST` | `/api/v1/harmonization/jobs/{job_id}/run` | Harmonize an ingested job and record findings and lineage |
 | `POST` | `/api/v1/quality/jobs/{job_id}/run` | Run canonical-field, land-rule, and PostGIS quality checks |
+| `POST` | `/api/v1/workflows/jobs/{job_id}/run` | Run the checkpointed ingestion → harmonization → QA workflow |
+| `GET` | `/api/v1/workflows/jobs/{job_id}` | Read workflow stage and persisted state summary |
 
 Example registration request body:
 
@@ -80,3 +82,5 @@ The response includes a job ID, file IDs, detected formats, SHA-256 hashes, row 
 After upload, call `POST /api/v1/harmonization/jobs/{job_id}/run` with the same bearer token. Exact normalized aliases are mapped deterministically; duplicate aliases for a canonical field are marked for review. Area values are converted only when their source column or declared metadata identifies the unit. Geometry is transformed with PyProj into EPSG:4326; invalid or out-of-bounds geometry is flagged and omitted from the canonical geometry column. Ambiguous dates and missing or invalid area values are retained in the raw row and generate findings for review. Duplicate plot IDs are recorded as candidate pairs, and disagreements in owner or area mark both records as conflicts. Every output record links back to its raw row and mapping/transformation history. The endpoint returns record counts, duplicate pairs, findings, and a summary quality score; running it a second time returns `409` to avoid duplicate output rows.
 
 Next, call `POST /api/v1/quality/jobs/{job_id}/run`. Pandera checks the canonical field schema; Python rules flag missing identifiers, non-positive areas, and missing owners; PostGIS checks stored geometry validity, emptiness, SRID, and polygon overlaps above one square metre. Findings are persisted with severity and review guidance. Quality execution is recorded and repeat calls return the stored report without duplicating findings. The score is a deterministic review-priority score, not an externally certified land-data rating.
+
+To run the full orchestrated sequence on a newly uploaded job, call `POST /api/v1/workflows/jobs/{job_id}/run`. LangGraph verifies the ingested rows, calls the deterministic harmonization and QA services, and persists checkpoints in PostgreSQL. `GET /api/v1/workflows/jobs/{job_id}` returns the current stage and state summary. This endpoint currently runs synchronously; Redis/Celery background execution is the next workflow milestone. The LangGraph graph does not call Gemini yet, so no paid LLM key is needed for this workflow.
